@@ -16,6 +16,14 @@ import type { System, TelemetryCommand } from './system.ts';
 import { renderFilePage, renderLapPage, type FilePage } from './viewFile.ts';
 import { WORKBENCH_PAGE } from './workbenchPage.ts';
 import {
+  buildReport,
+  issueUrl,
+  previewOf,
+  ReportError,
+  serializeReport,
+  type ReportRequest,
+} from './report.ts';
+import {
   runWorkbench,
   workbenchInfo,
   type WorkbenchRequest,
@@ -38,6 +46,8 @@ export interface ServerOptions {
   render?: (file: string) => FilePage;
   /** How a lap, or two, becomes a page. Default: by distance, with the model for one lap. */
   renderLaps?: typeof renderLapPage;
+  /** Where reports are saved. Default: the folder of the open recording. */
+  reportDir?: string;
 }
 
 const MAX_BODY = 64 * 1024;
@@ -91,6 +101,9 @@ export const startServer = async (
   let current: { name: string; path: string; page: FilePage } | undefined;
   let lastCommand: TelemetryCommand | undefined;
   let bench: string | undefined;
+  /** The workbench settings last run, which a report can carry. */
+  let benchRequest:
+    { values?: Record<string, number>; off?: readonly string[] } | undefined;
   let port = 0;
 
   const summary = () =>
@@ -102,6 +115,7 @@ export const startServer = async (
       note: current.page.note ?? null,
       laps: current.page.laps.map((l) => ({
         lap: l.lap,
+        startS: l.startS,
         timeS: l.timeS,
         complete: l.complete,
       })),
@@ -246,12 +260,69 @@ export const startServer = async (
             body as WorkbenchRequest,
           );
           bench = result.html;
+          benchRequest = {
+            values: (body as WorkbenchRequest).values,
+            off: (body as WorkbenchRequest).off,
+          };
           const { html: _html, ...rest } = result;
           void _html;
           return json(200, rest);
         } catch (e) {
           throw new HttpError(422, (e as Error).message);
         }
+      }
+      if (
+        url.pathname === '/api/report/preview' ||
+        url.pathname === '/api/report/save'
+      ) {
+        if (!current) throw new HttpError(404, 'No file is open yet');
+        const asked = body as unknown as ReportRequest & {
+          includeWorkbench?: boolean;
+        };
+        const request: ReportRequest = {
+          ...asked,
+          workbench:
+            asked.includeWorkbench === false ? {} : (benchRequest ?? {}),
+        };
+        let report;
+        try {
+          report = buildReport(current.page, request);
+        } catch (e) {
+          throw new HttpError(
+            e instanceof ReportError ? 400 : 422,
+            (e as Error).message,
+          );
+        }
+        const { gz, rawBytes } = serializeReport(report);
+        if (url.pathname === '/api/report/preview')
+          return json(200, {
+            preview: previewOf(report),
+            bytes: gz.length,
+            rawBytes,
+            hasWorkbench: benchRequest !== undefined,
+          });
+        const dir = options.reportDir ?? path.dirname(current.path);
+        const stamp = new Date()
+          .toISOString()
+          .replace(/[-:]/g, '')
+          .replace(/\..*/, '')
+          .replace('T', '-');
+        const name = `tire-lab-report-${stamp}.json.gz`;
+        const target = path.join(dir, name);
+        try {
+          fs.writeFileSync(target, gz, { flag: 'wx' });
+        } catch (e) {
+          throw new HttpError(
+            500,
+            `The report could not be saved to ${dir}: ${(e as Error).message}`,
+          );
+        }
+        return json(200, {
+          path: target,
+          name,
+          bytes: gz.length,
+          issueUrl: issueUrl(report, name),
+        });
       }
       if (url.pathname === '/api/telemetry') {
         const command = body.command as TelemetryCommand;

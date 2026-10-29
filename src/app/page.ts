@@ -66,6 +66,35 @@ a { color: var(--accent); }
     <p id="lapnote" class="muted"></p>
   </section>
 
+  <section id="reportsection" hidden>
+    <h2>Report a problem</h2>
+    <p class="muted">Found a value that does not match the game, a wrong channel or lap, or a failure? Build a report you can read before you save it. Nothing is sent anywhere: you save a file and attach it to an issue yourself. It holds the model\u2019s inputs for the run up to that moment (the temperature depends on the whole run), as plain numbers, with no names, ids, dates or session text.</p>
+    <label>What is wrong
+      <select id="rkind">
+        <option value="mismatch">A tire value does not match the game</option>
+        <option value="channel">A channel or its unit is wrong</option>
+        <option value="laps">The laps are wrong</option>
+        <option value="bug">The program failed</option>
+      </select>
+    </label>
+    <p></p>
+    <label>Session time of the moment, seconds <input id="rtime" type="number" min="0" step="any" placeholder="read it off the chart, or pick a lap start below"></label>
+    <div class="row"><label>or start of lap <select id="rlap"><option value="">(none)</option></select></label></div>
+    <p class="muted">What the game showed at that moment (leave empty if it is not about a value):</p>
+    <div id="robs"></div>
+    <div class="row"><button id="radd" type="button">Add a value</button></div>
+    <p></p>
+    <label>Anything else (no names or other personal details; up to 2000 characters)
+      <textarea id="rnote" rows="3" maxlength="2000" style="width:100%;box-sizing:border-box"></textarea>
+    </label>
+    <label class="switch"><input id="rbench" type="checkbox" checked><span>Include the workbench settings I last ran</span></label>
+    <div class="row"><button id="rpreview" type="button">Show what will be saved</button></div>
+    <p id="rsize" class="muted"></p>
+    <pre id="rpre" hidden style="max-height:320px;overflow:auto;white-space:pre-wrap;font-size:12px"></pre>
+    <div class="row"><button id="rsave" type="button" class="primary" disabled>Save the report</button></div>
+    <p id="rsaved"></p>
+  </section>
+
   <section>
     <h2>iRacing</h2>
     <p id="sim" class="muted">Checking…</p>
@@ -94,7 +123,52 @@ a { color: var(--accent); }
   $('openbench').addEventListener('click', function () {
     window.open('/workbench?t=' + encodeURIComponent(token), '_blank');
   });
+  // ---- the report form
+  function obsRow() {
+    var row = document.createElement('div'); row.className = 'row'; row.style.marginBottom = '6px';
+    var corner = document.createElement('select');
+    [['lf', 'Left front'], ['rf', 'Right front'], ['lr', 'Left rear'], ['rr', 'Right rear']].forEach(function (c) { var o = document.createElement('option'); o.value = c[0]; o.textContent = c[1]; corner.appendChild(o); });
+    var qty = document.createElement('select');
+    [['carcass', 'temperature (dash)'], ['tread', 'tread surface temperature'], ['pressure', 'pressure, kPa']].forEach(function (c) { var o = document.createElement('option'); o.value = c[0]; o.textContent = c[1]; qty.appendChild(o); });
+    var val = document.createElement('input'); val.type = 'number'; val.step = 'any'; val.placeholder = 'value'; val.style.width = '7em';
+    var src = document.createElement('select');
+    [['dash', 'cockpit readout'], ['pit-reading', 'pit-stop reading'], ['other', 'other']].forEach(function (c) { var o = document.createElement('option'); o.value = c[0]; o.textContent = c[1]; src.appendChild(o); });
+    [corner, qty, val, src].forEach(function (e) { row.appendChild(e); });
+    row.read = function () { return val.value === '' ? null : { corner: corner.value, quantity: qty.value, value: parseFloat(val.value), source: src.value }; };
+    return row;
+  }
+  function reportBody() {
+    var obs = [];
+    $('robs').childNodes.forEach(function (r) { var o = r.read(); if (o) obs.push(o); });
+    return { kind: $('rkind').value, t: parseFloat($('rtime').value), observed: obs, note: $('rnote').value, includeWorkbench: $('rbench').checked };
+  }
+  $('radd').addEventListener('click', function () { if ($('robs').childNodes.length < 8) $('robs').appendChild(obsRow()); });
+  $('radd').click();
+  $('rlap').addEventListener('change', function () { if ($('rlap').value !== '') $('rtime').value = $('rlap').value; });
+  ['rkind', 'rtime', 'rnote', 'rbench'].forEach(function (id) { $(id).addEventListener('input', function () { $('rsave').disabled = true; $('rsaved').textContent = ''; }); });
+  $('rpreview').addEventListener('click', function () {
+    $('error').textContent = '';
+    api('/api/report/preview', reportBody()).then(function (r) {
+      $('rpre').hidden = false; $('rpre').textContent = JSON.stringify(r.preview, null, 2);
+      $('rsize').textContent = 'Saved size: ' + (r.bytes / 1048576).toFixed(2) + ' MB compressed (' + (r.rawBytes / 1048576).toFixed(1) + ' MB as text). ' + (r.hasWorkbench ? '' : 'No workbench settings have been run.');
+      $('rsave').disabled = false;
+    }).catch(function (e) { $('rsave').disabled = true; fail(e); });
+  });
+  $('rsave').addEventListener('click', function () {
+    api('/api/report/save', reportBody()).then(function (r) {
+      var out = $('rsaved'); out.textContent = 'Saved ' + r.path + ' (' + (r.bytes / 1048576).toFixed(2) + ' MB). Attach it to the issue. ';
+      var a = document.createElement('a'); a.href = r.issueUrl; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Open the issue form on GitHub';
+      out.appendChild(a); $('rsave').disabled = true;
+    }).catch(fail);
+  });
+  function showReport(f) {
+    $('reportsection').hidden = !f;
+    var sel = $('rlap'); sel.textContent = '';
+    var none = document.createElement('option'); none.value = ''; none.textContent = '(none)'; sel.appendChild(none);
+    ((f && f.laps) || []).forEach(function (l) { var o = document.createElement('option'); o.value = String(l.startS); o.textContent = 'Lap ' + l.lap; sel.appendChild(o); });
+  }
   function showFile(f) {
+    showReport(f);
     $('benchsection').hidden = !f;
     showLaps(f);
     var out = $('result');

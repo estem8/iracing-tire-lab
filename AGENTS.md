@@ -12,3 +12,4 @@
 - Do not claim the model reproduces iRacing's tire physics. It is the overlay's empirical estimate. The workbench shows how that estimate responds, not how the game does.
 - The program sends a command to a running game (telemetry start or stop) and opens files on request: the local server needs its token, the loopback Host and a JSON POST with the token header (see `src/app/server.ts` and its tests). Do not weaken any of them.
 - Parts of `src/ibt/` and the model are adapted from irdashies (MIT); keep the provenance headers and `NOTICE`.
+- Reports (`src/app/report.ts`): a report carries the model's inputs as plain numbers and nothing from the session text, no path and no recording. Do not add fields without checking that. Adding a column means adding it to `FIELDS`; `readReport` refuses columns it does not know.

@@ -4,7 +4,7 @@ Four ways to help, from least to most work.
 
 ## 1. Report a mismatch
 
-Open an issue with the "Does not match the game" form. Say which car and track, which number (cockpit readout, live channel or `.ibt`), and what you saw.
+Use **Report a problem** in the app ([docs/reporting.md](docs/reporting.md)): it builds a file you read before saving and attach to the issue. Or open an issue with the "Does not match the game" form by hand. Say which car and track, which number (cockpit readout, live channel or `.ibt`), and what you saw.
 
 ## 2. Share a recording
 

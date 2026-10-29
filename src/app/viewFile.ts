@@ -8,14 +8,22 @@ import {
   type Lap,
 } from '../chart/index.ts';
 import { IbtFile } from '../ibt/reader.ts';
-import { summarizeSession } from '../ibt/session.ts';
+import { summarizeSession, type SessionSummary } from '../ibt/session.ts';
 import { makeSamples, stepSamples, type ScoreStep } from '../metrics/index.ts';
 import type { TireSample } from '../model/types.ts';
 import { OverlayModel } from '../model/overlayModel.ts';
 import { PRODUCTION_HZ, APP_ARRIVAL_HZ } from '../replay/replay.ts';
 import { frames } from '../replay/samples.ts';
 
+/** What a report says about the file: no personal fields. */
+export interface FileMeta {
+  session: SessionSummary;
+  file: { tickRate: number; records: number; durationS: number };
+  channels: { name: string; unit: string; desc: string; count: number }[];
+}
+
 export interface FilePage {
+  meta: FileMeta;
   html: string;
   /** Records in the file. */
   records: number;
@@ -42,7 +50,8 @@ export const renderFilePage = (path: string): FilePage => {
   const file = IbtFile.open(path);
   try {
     let data = buildChartData(file);
-    const car = summarizeSession(file.sessionYaml).carPath;
+    const session = summarizeSession(file.sessionYaml);
+    const car = session.carPath;
     let note: string | undefined;
     let steps: ScoreStep[] = [];
     let samples: TireSample[] = [];
@@ -71,6 +80,20 @@ export const renderFilePage = (path: string): FilePage => {
       laps: findLaps(file),
       steps,
       samples,
+      meta: {
+        session,
+        file: {
+          tickRate: file.header.tickRate,
+          records: file.recordCount,
+          durationS: file.recordCount / Math.max(1, file.header.tickRate),
+        },
+        channels: file.vars.map((v) => ({
+          name: v.name,
+          unit: v.unit,
+          desc: v.desc,
+          count: v.count,
+        })),
+      },
     };
   } finally {
     file.close();

@@ -30,6 +30,7 @@ import { OverlayModel } from '../model/overlayModel.ts';
 import { startServer } from '../app/server.ts';
 import { defaultSystem, type TelemetryCommand } from '../app/system.ts';
 import { renderFilePage, renderLapPage } from '../app/viewFile.ts';
+import { readReport, replayReport } from '../app/report.ts';
 import type { CarSample, Corner, TireSample } from '../model/types.ts';
 import {
   APP_ARRIVAL_HZ,
@@ -47,6 +48,7 @@ const USAGE = `usage:
   tire-lab anonymize <in.ibt> <out.ibt>
   tire-lab laps <file.ibt>                                 the laps of a recording, with lap times
   tire-lab lapchart <file.ibt> --lap N [--compare M] [--out page.html] [--no-open]   one lap, or two, by distance
+  tire-lab replay-report <report.json.gz>                  run the model again on a problem report and compare with what the user saw
   tire-lab view <file.ibt> [--out page.html] [--no-open]   chart with the model, opened in the browser
   tire-lab app [--no-open] [--port N] [--self-test]        local page: open files, switch iRacing's recording
   tire-lab telemetry <on|off>                              tell iRacing to start or stop recording (Windows)`;
@@ -347,6 +349,37 @@ const anonymize = (args: string[]): void => {
   );
 };
 
+/** Runs the model again on a problem report, as its sender's app did, and sets it beside what they saw. */
+const replayReportCommand = (args: string[]): void => {
+  const report = readReport(fs.readFileSync(args[0]));
+  const replay = replayReport(report);
+  console.log(
+    `${report.kind}: ${report.car ?? 'car not named'}, ${report.session.trackName ?? 'track not named'}, moment ${report.moment.t} s`,
+  );
+  console.log(
+    `lab ${report.tool.lab}, model ${report.tool.modelVersion}, ${report.series.count} rows from ${report.series.from} s to ${report.series.to} s`,
+  );
+  if (report.note) console.log(`note: ${report.note}`);
+  const changed = Object.keys(report.workbench.values).length > 0;
+  console.log(
+    changed
+      ? 'workbench settings: ' + JSON.stringify(report.workbench.values)
+      : 'workbench settings: none',
+  );
+  for (const o of replay.observed) {
+    console.log(
+      `${o.corner.toUpperCase()} ${o.quantity}: game ${o.value} (${o.source}) | model ${o.unchanged ?? '-'} (error ${o.unchangedError ?? '-'})` +
+        (changed
+          ? ` | with the settings ${o.tuned ?? '-'} (error ${o.tunedError ?? '-'})`
+          : ''),
+    );
+  }
+  if (replay.observed.length === 0) console.log('no game values were given');
+  console.log(
+    `this run of the unchanged model differs from the sender's by at most ${replay.roundingGap} C (the inputs are rounded)`,
+  );
+};
+
 /** Lists the laps of a recording: number, time, and whether the lap is whole. */
 const lapsCommand = (args: string[]): void => {
   const page = renderFilePage(args[0]);
@@ -496,6 +529,8 @@ const main = async (): Promise<void> => {
     if (command === 'score' && args[0]) return scoreCommand(args);
     if (command === 'view' && args[0]) return await view(args);
     if (command === 'laps' && args[0]) return lapsCommand(args);
+    if (command === 'replay-report' && args[0])
+      return replayReportCommand(args);
     if (command === 'lapchart' && args[0]) return await lapChartCommand(args);
     if (command === 'app') return await appCommand(args);
     if (command === 'telemetry') return await telemetryCommand(args);
