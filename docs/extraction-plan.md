@@ -126,7 +126,7 @@ Then in irdashies, on a local branch: `TireProcessor` keeps wear, load, alignmen
 
 Found while planning the adapter, added in 0.2.0: **saved gains** (`OverlayModel(car, { startingGains })`, asked for at construction and at each new session, skipped for a car that does not calibrate; `gains()` and `applyStartingGains()`), the **`pressureEstimated`** flag on the shown pressure (the overlay's local fix, so the label can say `~`), and the calibration policy and `MODEL_VERSION` exported from `iracing-tire-lab/model`. Tested on the model.
 
-One difference to keep in mind: the converter takes the number 1 as a set flag as well as `true`; the overlay takes only `true`. The SDK sends booleans, so it should not matter, but it is not the same code.
+A flag channel is read as the overlay reads it: only the booleans `true` and `false` count, a number there is null (changed in 0.2.1; 0.2.0 took the number 1 as set).
 
 Still to do for the milestone, and all of it is in irdashies: the refactor on a local branch, the copied contract test, CI on a temporary `ci/` branch, and the pull request. Nothing there has been changed or pushed.
 

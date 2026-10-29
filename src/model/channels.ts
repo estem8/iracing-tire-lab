@@ -39,6 +39,11 @@ const FLAGS = {
   brakeAbsActive: 'BrakeABSactive',
 } as const;
 
+/** Channels that are booleans in the SDK. */
+export const FLAG_CHANNEL_NAMES: ReadonlySet<string> = new Set(
+  Object.values(FLAGS),
+);
+
 const TIRE_CHANGE = {
   lf: 'dpLFTireChange',
   rf: 'dpRFTireChange',

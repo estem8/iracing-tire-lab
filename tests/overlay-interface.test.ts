@@ -117,6 +117,8 @@ test('fromTelemetryFrame: absent and odd channels are null, never 0', () => {
     Throttle: { value: ['x'] },
     IsOnTrack: { value: [true] },
     OnPitRoad: { value: [false] },
+    PitstopActive: { value: [1] }, // a number is not a flag
+    BrakeABSactive: { value: ['true'] },
     LFtempCL: { value: [60] },
     LFtempCM: { value: [61] },
     LFtempCR: { value: [62] },
@@ -135,7 +137,8 @@ test('fromTelemetryFrame: absent and odd channels are null, never 0', () => {
   assert.equal(s.car.brake, null);
   assert.equal(s.car.isOnTrack, true);
   assert.equal(s.car.onPitRoad, false);
-  assert.equal(s.car.pitstopActive, null); // absent, not false
+  assert.equal(s.car.pitstopActive, null); // a number, not a boolean
+  assert.equal(s.car.brakeAbsActive, null);
   assert.deepEqual(s.wheels.lf.carcass, [60, 61, 62]);
   assert.equal(s.wheels.rf.carcass, null); // a zone is missing
   assert.equal(s.wheels.lf.treadRemaining, null);

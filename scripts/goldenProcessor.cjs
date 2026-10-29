@@ -61,12 +61,16 @@ for (const car of CARS) for (const variant of VARIANTS) {
     const frame: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(f)) frame[k] = { value: [v] };
     p.onFrame(frame as never);
-    const corners = p.snapshot().corners as Record<string, { temp: number[]; tempReal?: number[]; disc?: number; pressure?: number }>;
+    const corners = p.snapshot().corners as Record<string, { temp: number[]; tempReal?: number[]; disc?: number; pressure?: number; wear: number[]; estimated: boolean; tempEstimated: boolean; wearPerLap?: number[] }>;
     for (const c of ['lf', 'rf', 'lr', 'rr']) {
       (cols[c + '.tread'] ??= []).push(corners[c]?.tempReal?.[0] ?? null);
       (cols[c + '.temp'] ??= []).push(corners[c]?.temp[1] ?? null);
       (cols[c + '.disc'] ??= []).push(corners[c]?.disc ?? null);
       (cols[c + '.pressure'] ??= []).push(corners[c]?.pressure ?? null);
+      // The next three are the overlay's own (wear is not in the lab); the lab tests ignore them.
+      (cols[c + '.wear'] ??= []).push(corners[c]?.wear[1] ?? null);
+      (cols[c + '.estimated'] ??= []).push(corners[c] ? Number(corners[c].estimated) : null);
+      (cols[c + '.tempEstimated'] ??= []).push(corners[c] ? Number(corners[c].tempEstimated) : null);
     }
   }
   out[car + '/' + variant] = cols;

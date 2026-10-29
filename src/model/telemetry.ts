@@ -1,4 +1,4 @@
-import { readCar, SHOCK_DEFL } from './channels.ts';
+import { FLAG_CHANNEL_NAMES, readCar, SHOCK_DEFL } from './channels.ts';
 import type { Corner, Measured, TireSample, WheelSample } from './types.ts';
 
 /**
@@ -39,10 +39,10 @@ const zones = (frame: TelemetryFrame, prefix: string) => {
  * without SessionTime, so the model takes no time step for that frame. `dt` is
  * 0: the model works the step out from the clock itself.
  *
- * Differences from the overlay's own reading, on purpose or by shape: a flag
- * channel counts as set for the boolean true (or the number 1), where the
- * overlay accepts only true; shock travel falls back to the NASCAR name
- * (`LFSHshockDefl`) as the overlay does.
+ * A flag channel (IsOnTrack, OnPitRoad, PitstopActive, BrakeABSactive) counts
+ * only as the boolean true or false, as in the overlay; any other value is
+ * null. Shock travel falls back to the NASCAR name (`LFSHshockDefl`) as the
+ * overlay does.
  */
 export const fromTelemetryFrame = (frame: TelemetryFrame): TireSample => {
   const wheel = (c: Corner): WheelSample => {
@@ -65,7 +65,11 @@ export const fromTelemetryFrame = (frame: TelemetryFrame): TireSample => {
     speed: num(frame, 'Speed'),
     car: readCar((name) => {
       const v = first(frame, name);
-      return typeof v === 'number' || typeof v === 'boolean' ? v : null;
+      // A flag is the boolean true or false, as the overlay reads it; a number
+      // there says nothing (null), it is not taken for 1 or 0.
+      if (FLAG_CHANNEL_NAMES.has(name))
+        return typeof v === 'boolean' ? v : null;
+      return typeof v === 'number' ? v : null;
     }),
     wheels,
   };
