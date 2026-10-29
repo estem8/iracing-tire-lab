@@ -6,6 +6,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { IbtFile } from '../src/ibt/reader.ts';
 import { buildIbt } from '../src/ibt/testBuilder.ts';
+import { EMPTY_CAR } from '../src/model/channels.ts';
 import { IbtVarType } from '../src/ibt/types.ts';
 import { applyMask } from '../src/model/mask.ts';
 import type {
@@ -49,11 +50,13 @@ const wheelAll: WheelSample = {
   treadRemaining: [0.9, 0.9, 0.9],
   coldPressureKpa: 160,
   hotPressureKpa: 190,
+  shockDeflM: null,
 };
 const sample: TireSample = {
   t: 1,
   dt: 0.1,
   speed: 30,
+  car: EMPTY_CAR,
   wheels: { lf: wheelAll, rf: wheelAll, lr: wheelAll, rr: wheelAll },
 };
 
@@ -227,4 +230,54 @@ test('cli sample writes the masked input stream at the overlay rates', () => {
     .slice(2)
     .map((l) => Math.round(Number(l.split(',')[header.indexOf('dt')]) * 1000));
   assert.deepEqual([...new Set(ms)].sort(), [100, 50]); // alternating, as in the app
+});
+
+const SDK_RECORD = (extra: Record<string, number>) => ({
+  SessionTick: 0,
+  SessionTime: 0,
+  ...extra,
+});
+
+test('car-level channels come through as numbers and flags; absent ones are null', () => {
+  const file = path.join(os.tmpdir(), `car-${process.pid}.ibt`);
+  fs.writeFileSync(
+    file,
+    buildIbt({
+      yaml: 'WeekendInfo:\n TrackName: t\n',
+      vars: [
+        { name: 'SessionTick', type: IbtVarType.Int },
+        { name: 'SessionTime', type: IbtVarType.Double },
+        { name: 'LatAccel', type: IbtVarType.Float },
+        { name: 'IsOnTrack', type: IbtVarType.Bool },
+        { name: 'OnPitRoad', type: IbtVarType.Bool },
+        { name: 'dpLFTireChange', type: IbtVarType.Float },
+        { name: 'LFshockDefl', type: IbtVarType.Float },
+      ],
+      rows: [
+        SDK_RECORD({
+          LatAccel: 9.5,
+          IsOnTrack: 1,
+          OnPitRoad: 0,
+          dpLFTireChange: 1,
+          LFshockDefl: 0.02,
+        }),
+      ],
+    }),
+  );
+  const ibt = IbtFile.open(file);
+  const [frame] = [...frames(ibt)];
+  ibt.close();
+  fs.rmSync(file);
+  const { car, wheels } = frame.sample;
+  assert.equal(car.latAccel, 9.5);
+  assert.equal(car.isOnTrack, true);
+  assert.equal(car.onPitRoad, false);
+  assert.equal(car.tireChange.lf, 1);
+  assert.equal(wheels.lf.shockDeflM, Math.fround(0.02));
+  // Everything the file lacks is null, not 0 and not false.
+  assert.equal(car.throttle, null);
+  assert.equal(car.brakeAbsActive, null);
+  assert.equal(car.pitstopActive, null);
+  assert.equal(car.tireChange.rr, null);
+  assert.equal(wheels.rr.shockDeflM, null);
 });

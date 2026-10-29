@@ -14,7 +14,7 @@ import { IbtError } from '../ibt/errors.ts';
 import { IbtFile } from '../ibt/reader.ts';
 import { anonymizeSessionYaml, summarizeSession } from '../ibt/session.ts';
 import type { InputMask } from '../model/mask.ts';
-import type { Corner, TireSample } from '../model/types.ts';
+import type { CarSample, Corner, TireSample } from '../model/types.ts';
 import {
   APP_ARRIVAL_HZ,
   modelInputs,
@@ -122,19 +122,49 @@ const sampleColumns = (): string[] => [
   't',
   'dt',
   'speed',
+  ...CAR_COLUMNS.map(([name]) => name),
   ...CORNER_ORDER.flatMap((c) => [
     ...['L', 'M', 'R'].map((z) => `${c}.carcass${z}`),
     ...['L', 'M', 'R'].map((z) => `${c}.surface${z}`),
     ...['L', 'M', 'R'].map((z) => `${c}.wear${z}`),
     `${c}.coldKpa`,
     `${c}.hotKpa`,
+    `${c}.shockDeflM`,
   ]),
+];
+const flagCell = (v: boolean | null): number | null =>
+  v === null ? null : v ? 1 : 0;
+/** Car-level columns of the sample CSV: the header and how to read each. */
+const CAR_COLUMNS: [string, (c: CarSample) => number | null][] = [
+  ['sessionNum', (c) => c.sessionNum],
+  ['isOnTrack', (c) => flagCell(c.isOnTrack)],
+  ['onPitRoad', (c) => flagCell(c.onPitRoad)],
+  ['pitstopActive', (c) => flagCell(c.pitstopActive)],
+  ['pitSvFlags', (c) => c.pitSvFlags],
+  ['velocityX', (c) => c.velocityX],
+  ['velocityY', (c) => c.velocityY],
+  ['yawRate', (c) => c.yawRate],
+  ['steeringWheelAngle', (c) => c.steeringWheelAngle],
+  ['steeringWheelTorque', (c) => c.steeringWheelTorque],
+  ['latAccel', (c) => c.latAccel],
+  ['longAccel', (c) => c.longAccel],
+  ['vertAccel', (c) => c.vertAccel],
+  ['throttle', (c) => c.throttle],
+  ['brake', (c) => c.brake],
+  ['brakeAbsActive', (c) => flagCell(c.brakeAbsActive)],
+  ['dcBrakeBias', (c) => c.dcBrakeBias],
+  ['airTemp', (c) => c.airTemp],
+  ['trackTemp', (c) => c.trackTemp],
+  ['trackTempCrew', (c) => c.trackTempCrew],
+  ['lapCompleted', (c) => c.lapCompleted],
+  ['lapDistPct', (c) => c.lapDistPct],
 ];
 const cell = (v: number | null): string => (v === null ? '' : String(v));
 const sampleCells = (s: TireSample): string[] => [
   String(s.t),
   String(s.dt),
   cell(s.speed),
+  ...CAR_COLUMNS.map(([, read]) => cell(read(s.car))),
   ...CORNER_ORDER.flatMap((c) => {
     const w = s.wheels[c];
     return [
@@ -143,6 +173,7 @@ const sampleCells = (s: TireSample): string[] => [
       ...[0, 1, 2].map((i) => cell(w.treadRemaining?.[i] ?? null)),
       cell(w.coldPressureKpa),
       cell(w.hotPressureKpa),
+      cell(w.shockDeflM),
     ];
   }),
 ];

@@ -7,6 +7,7 @@
  * as a whole.
  */
 import { readVarValue } from '../ibt/binary.ts';
+import { SHOCK_DEFL, readCar } from '../model/channels.ts';
 import type { IbtFile } from '../ibt/reader.ts';
 import type { IbtVarHeader } from '../ibt/types.ts';
 import type {
@@ -61,6 +62,15 @@ export const frames = function* (file: IbtFile): Generator<ReplayFrame> {
     }),
   );
 
+  const shock = Object.fromEntries(
+    CORNERS.map((c) => [c, scalar(SHOCK_DEFL[c])]),
+  ) as Record<Corner, Header>;
+  const carHeaders = new Map<string, Header>();
+  const carHeader = (name: string): Header => {
+    if (!carHeaders.has(name)) carHeaders.set(name, scalar(name));
+    return carHeaders.get(name);
+  };
+
   const one = (rec: Buffer, h: Header): Measured<number> => {
     if (!h) return null;
     const v = readVarValue(rec, h);
@@ -90,6 +100,7 @@ export const frames = function* (file: IbtFile): Generator<ReplayFrame> {
             treadRemaining: zones(rec, w.wear),
             coldPressureKpa: one(rec, w.cold),
             hotPressureKpa: one(rec, w.hot),
+            shockDeflM: one(rec, shock[c]),
           },
         ];
       }),
@@ -99,6 +110,10 @@ export const frames = function* (file: IbtFile): Generator<ReplayFrame> {
       sample: {
         t: one(rec, time) ?? clock,
         speed: one(rec, speed),
+        car: readCar((name) => {
+          const h = carHeader(name);
+          return h ? one(rec, h) : undefined;
+        }),
         wheels: out,
       },
     };

@@ -61,3 +61,22 @@ test('the examples run and print what the docs promise', () => {
   );
   assert.match(replay, /"kind":"estimate"/);
 });
+
+test('every car-level channel the lab reads is in the registry', async () => {
+  const { CAR_CHANNEL_NAMES } = await import('../src/model/channels.ts');
+  const names = new Set<string>();
+  const expand = (name: string): string[] => {
+    const m = /\{([^}]*)\}/.exec(name);
+    if (!m) return [name];
+    return m[1]
+      .split(',')
+      .flatMap((alt) => expand(name.replace(m[0], alt.trim())));
+  };
+  for (const m of yamlText.matchAll(/^ {2}- name: '?([^'\n]+)'?$/gm))
+    for (const expanded of expand(m[1]))
+      for (const n of expanded.split(',')) names.add(n.trim());
+  const missing = [...CAR_CHANNEL_NAMES, 'LFshockDefl'].filter(
+    (n) => !names.has(n),
+  );
+  assert.deepEqual(missing, []);
+});

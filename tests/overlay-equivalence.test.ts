@@ -123,3 +123,25 @@ test('without the state machine the lab diverges at a tire change', () => {
     `largest tread difference after the stop: ${worst.toFixed(1)} C`,
   );
 });
+
+test('a car sample round-trips to the channels the physics reads, nulls left out', async () => {
+  const { EMPTY_CAR, carChannels } = await import('../src/model/channels.ts');
+  const { frameOf } = await import('../src/model/overlayPhysics.ts');
+  const sample = {
+    t: 3,
+    dt: 0.05,
+    speed: 40,
+    car: { ...EMPTY_CAR, latAccel: 5, isOnTrack: true, onPitRoad: false },
+    wheels: {} as never,
+  };
+  assert.deepEqual(carChannels(sample.car), {
+    LatAccel: 5,
+    IsOnTrack: true,
+    OnPitRoad: false,
+  });
+  const frame = frameOf(sample);
+  assert.equal(frame.SessionTime, 3);
+  assert.equal(frame.Speed, 40);
+  assert.equal('Throttle' in frame, false); // absent, not 0
+  assert.equal(frameOf({ ...sample, speed: null }).Speed, undefined);
+});

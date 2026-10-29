@@ -24,6 +24,53 @@ export interface WheelSample {
   coldPressureKpa: Measured<number>;
   /** Hot pressure, kPa. Unverified channel. */
   hotPressureKpa: Measured<number>;
+  /** Suspension deflection, m. Unverified channel. */
+  shockDeflM: Measured<number>;
+}
+
+/**
+ * Car-level inputs the overlay's tire model reads (docs/extraction-plan.md
+ * section 4). Every field is null when the source does not have the channel;
+ * all are unverified except where channels/channels.yaml says otherwise.
+ */
+export interface CarSample {
+  sessionNum: Measured<number>;
+  /** Pit service checkbox bits, tire change in 0x1 LF, 0x2 RF, 0x4 LR, 0x8 RR. */
+  pitSvFlags: Measured<number>;
+  /** Pit menu tire boxes (dpLFTireChange and so on); a value above 0 means change. */
+  tireChange: Record<
+    'lf' | 'rf' | 'lr' | 'rr' | 'left' | 'right',
+    Measured<number>
+  >;
+  /** m/s, in the car's frame. Unverified. */
+  velocityX: Measured<number>;
+  velocityY: Measured<number>;
+  /** rad/s */
+  yawRate: Measured<number>;
+  /** rad */
+  steeringWheelAngle: Measured<number>;
+  /** N*m. Unverified. */
+  steeringWheelTorque: Measured<number>;
+  /** m/s^2, gravity included for vertAccel. */
+  latAccel: Measured<number>;
+  longAccel: Measured<number>;
+  vertAccel: Measured<number>;
+  /** Pedals, 0..1. */
+  throttle: Measured<number>;
+  brake: Measured<number>;
+  /** The brake bias setting; its meaning is unverified. */
+  dcBrakeBias: Measured<number>;
+  /** deg C */
+  airTemp: Measured<number>;
+  /** Deprecated in the sim; mirrors trackTempCrew. */
+  trackTemp: Measured<number>;
+  trackTempCrew: Measured<number>;
+  lapCompleted: Measured<number>;
+  lapDistPct: Measured<number>;
+  isOnTrack: Measured<boolean>;
+  onPitRoad: Measured<boolean>;
+  pitstopActive: Measured<boolean>;
+  brakeAbsActive: Measured<boolean>;
 }
 
 export interface TireSample {
@@ -32,6 +79,7 @@ export interface TireSample {
   /** Seconds since the previous sample; the caller decides what a gap is. */
   dt: number;
   speed: Measured<number>;
+  car: CarSample;
   wheels: Record<Corner, WheelSample>;
 }
 

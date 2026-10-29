@@ -75,7 +75,7 @@ fs.symlinkSync(
 
 const usage = `
 import { IbtFile, IbtVarType } from 'iracing-tire-lab/ibt';
-import { applyMask, type TireModel } from 'iracing-tire-lab/model';
+import { applyMask, EMPTY_CAR, type TireModel } from 'iracing-tire-lab/model';
 import { frames, replayModel, PRODUCTION_HZ } from 'iracing-tire-lab/replay';
 import { buildChartData, renderChartHtml } from 'iracing-tire-lab/chart';
 import { buildIbt } from 'iracing-tire-lab/testing';
@@ -110,7 +110,7 @@ const steps = [...replayModel(model, frames(ibt), { hz: PRODUCTION_HZ, mask: 'li
 const page = renderChartHtml(buildChartData(ibt, { channels: ['LFtempCM'] }));
 ibt.close();
 const masked = applyMask(
-  { t: 0, dt: 0, speed: null, wheels: {} as never },
+  { t: 0, dt: 0, speed: null, car: EMPTY_CAR, wheels: {} as never },
   'all'
 );
 console.log(JSON.stringify({ steps: steps.length, last: steps[steps.length - 1].output, masked: masked.speed, page: page.startsWith('<!doctype html>') && page.includes('LFtempCM') }));

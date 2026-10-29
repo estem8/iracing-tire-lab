@@ -85,3 +85,66 @@ channels:
     status: verified
     evidence: same dump
     update_behaviour: 'Each also has a 360 Hz *_ST array form (count 6)'
+
+  - name: TrackTemp
+    meaning: Track temperature. Marked deprecated in the sim's own description.
+    unit: C
+    status: verified
+    evidence: same dump (mirrors TrackTempCrew)
+    update_behaviour: unknown
+
+  - name: 'SessionNum, LapCompleted, LapDistPct'
+    meaning: Session index, completed laps, and the fraction of the lap.
+    unit: 'index, laps, fraction'
+    status: unverified
+    evidence: "read by irdashies' TireProcessor; not seen in a var table by this lab"
+    update_behaviour: unknown
+
+  - name: 'IsOnTrack, OnPitRoad, PitstopActive, BrakeABSactive'
+    meaning: Booleans. The overlay's model stops stepping when IsOnTrack is not true.
+    unit: bool
+    status: unverified
+    evidence: "read by irdashies' TireProcessor; not seen in a var table by this lab"
+    update_behaviour: unknown
+
+  - name: 'dp{LF,RF,LR,RR,L,R}TireChange'
+    meaning: Pit menu tire change boxes (single tire, or left / right pair). A value above 0 means change.
+    unit: unknown
+    status: unverified
+    evidence: "read by irdashies' TireProcessor; not seen in a var table by this lab"
+    update_behaviour: unknown
+
+  - name: 'VelocityX, VelocityY'
+    meaning: Velocity in the car's frame (forward and sideways).
+    unit: m/s
+    status: unverified
+    evidence: "read by irdashies' TireProcessor; unit assumed, not seen in a var table by this lab"
+    update_behaviour: unknown
+
+  - name: SteeringWheelTorque
+    meaning: Torque on the steering wheel; the overlay uses its magnitude as an understeer hint.
+    unit: N*m
+    status: unverified
+    evidence: "read by irdashies' TireProcessor; unit assumed"
+    update_behaviour: unknown
+
+  - name: 'Throttle, Brake'
+    meaning: Pedal positions after any assist, 0 to 1.
+    unit: fraction
+    status: unverified
+    evidence: "read by irdashies' TireProcessor; not seen in a var table by this lab"
+    update_behaviour: unknown
+
+  - name: dcBrakeBias
+    meaning: Brake bias setting. The overlay reads it as a front percentage between 20 and 80; the sim describes it as an adjustment.
+    unit: unknown
+    status: unverified
+    evidence: "read by irdashies' TireProcessor; meaning not confirmed"
+    update_behaviour: unknown
+
+  - name: '{LF,RF,LR,RR}shockDefl'
+    meaning: Shock deflection.
+    unit: m
+    status: unverified
+    evidence: "read by irdashies' TireProcessor; unit assumed"
+    update_behaviour: unknown

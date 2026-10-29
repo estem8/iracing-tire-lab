@@ -3,7 +3,8 @@ import type { TireProfile } from './irdashies/tireProfiles.ts';
 import { TireSurfaceModel } from './irdashies/TireSurfaceModel.ts';
 import { TireThermalModel } from './irdashies/TireThermalModel.ts';
 import { slideOf, slipAngles } from './irdashies/YawGrip.ts';
-import type { Corner } from './types.ts';
+import { carChannels } from './channels.ts';
+import type { Corner, TireSample } from './types.ts';
 
 /** Copied from TireProcessor.ts, which is not vendored (it is the glue, see docs/extraction-plan.md). */
 const DEFAULT_AMBIENT = 25;
@@ -129,3 +130,14 @@ export class OverlayPhysics {
     return this.surface.temp(corner);
   }
 }
+
+/**
+ * A model input sample as the channel frame the physics reads. A null field is
+ * left out, so the physics falls back exactly as the overlay does for a channel
+ * the sim did not send.
+ */
+export const frameOf = (sample: TireSample): ChannelFrame => ({
+  ...carChannels(sample.car),
+  SessionTime: sample.t,
+  ...(sample.speed !== null && { Speed: sample.speed }),
+});
