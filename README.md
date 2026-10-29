@@ -1,24 +1,52 @@
 # iracing-tire-lab
 
-A research lab for an empirically validated model of iRacing tire state. It reads `.ibt` telemetry, exports chosen channels, and (next) replays them through a pure model and measures the error against what the game reports.
+A lab for looking at, testing and improving the tire-state estimate of the [irdashies](https://github.com/tariknz/irdashies) tires widget. It reads iRacing `.ibt` telemetry, runs the widget's model on it exactly as the overlay would, draws the tires, compares laps, lets you switch the model's parts off and change its numbers, and measures the error against reference values.
 
-**Status: scaffold.** There is no model yet. What exists is a reader, a CLI and the rules for contributing. The goal is a small model package that the [irdashies](https://github.com/tariknz/irdashies) tire widget can use, not a simulation of iRacing's internal tire physics.
+It is **not** a simulation of iRacing's tire physics, and nothing here says what the game does inside. The model is the overlay's own empirical estimate.
 
-## Use
+## Status: early, never run on a real recording
 
-Needs Node >= 24. New here? Start with [docs/getting-started.md](docs/getting-started.md); what is known about each channel is in [docs/channels.md](docs/channels.md).
+- **What is checked:** the code and the model against the real overlay processor on synthetic drives (every frame of 18 runs), the reader and the pages on synthetic `.ibt` files, a Windows build of the program on a Windows runner.
+- **What is not:** no real `.ibt` has been read by this project. The channel names, units and meanings are in [docs/channels.md](docs/channels.md) with their status, and most are `unverified`. The accuracy of the model against the game's own readings has not been measured. The pages have been driven in a simulated browser, not looked at in a real one. The iRacing recording switch has not been tried against a running iRacing.
+- If something does not match what you see in the game, please [open an issue](../../issues/new/choose).
+
+## What it does
+
+|               |                                                                                                                                                                       |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Read**      | `.ibt` files: channels, units, session summary without personal fields, export to CSV                                                                                 |
+| **Chart**     | any channels, one chart per unit, a switch per series, zoom, hover, table view                                                                                        |
+| **Model**     | the overlay's tire estimate beside the recording, with the tires drawn as the widget draws them                                                                       |
+| **Laps**      | split by lap, charted by distance, two laps compared with the time difference                                                                                         |
+| **Workbench** | the model's 23 components with what they do and which channels they read; switch them off, change their numbers, see the estimate respond; pick the channels to chart |
+| **Measure**   | error (MAE, RMSE, largest, bias) against reference values such as dash readings                                                                                       |
+| **Program**   | `tire-lab.exe` for Windows: open a file, a switch that tells iRacing to start or stop its telemetry recording                                                         |
+
+## Use it
+
+**On Windows, without installing anything:** take `tire-lab.exe` from the _Windows executable_ workflow's artifacts (Actions tab) and double-click it, or drop an `.ibt` file on it. See [docs/exe.md](docs/exe.md). It is not signed, so Windows will warn about an unknown publisher.
+
+**From source** (Node 24 or later; no build step):
 
 ```
+git clone https://github.com/estem8/iracing-tire-lab
+cd iracing-tire-lab
 npm install
+npm run tire-lab -- app                            # the local page: open files, laps, tires, workbench
 npm run tire-lab -- inspect session.ibt            # channels, units, session summary
+npm run tire-lab -- chart session.ibt --out chart.html --model   # recording plus the model, tires panel
+npm run tire-lab -- laps session.ibt               # laps and lap times
+npm run tire-lab -- lapchart session.ibt --lap 5 --compare 7     # two laps by distance
+npm run tire-lab -- score session.ibt --reference ref.json       # error against dash readings
 npm run tire-lab -- export session.ibt --channels SessionTime,Speed,LFtempCL --out stint.csv --stride 3
-npm run tire-lab -- chart session.ibt --out chart.html   # open in a browser; a switch per series
-npm run tire-lab -- sample session.ibt --out input.csv   # what a model would be given: 20 Hz frames, 15 Hz ticks, live inputs only
-npm run tire-lab -- anonymize in.ibt out.ibt       # best-effort redaction of names and ids; read the result
+npm run tire-lab -- sample session.ibt --out input.csv           # what a model would be given
+npm run tire-lab -- anonymize in.ibt out.ibt       # best-effort redaction; read the result
 npm test
 ```
 
-`anonymize` is best effort. It blanks the fields it knows (names, user and team ids, iRating, session ids) and has not yet been checked on a real recording. It does not remove the session date, track, car or lap times, which can identify a session. To share data, prefer a CSV from `export`, and read any anonymized file with `inspect <file> --session` before sharing it.
+New here? [docs/getting-started.md](docs/getting-started.md) goes step by step. The workbench is explained in [docs/workbench.md](docs/workbench.md).
+
+`anonymize` is best effort. It blanks the fields it knows (names, user and team ids, iRating, session ids) and has not been checked on a real recording. It does not remove the session date, track, car or lap times, which can identify a session. To share data, prefer a CSV from `export`, and read any anonymized file with `inspect <file> --session` before sharing it. Never commit a recording; `.gitignore` and CI refuse them.
 
 ## Judging a model the way the overlay would run it
 
@@ -32,31 +60,40 @@ A recording can hold more than the overlay receives, and the overlay does not gi
 
 ## Layout
 
-| Path                         | What                                                             |
-| ---------------------------- | ---------------------------------------------------------------- |
-| `src/ibt/`                   | `.ibt` reader: header, var table with units, array channels      |
-| `src/cli/`                   | `inspect`, `export`, `chart`, `sample`, `anonymize`              |
-| `src/chart/`                 | HTML chart of channels with a switch per series                  |
-| `src/replay/`                | IBT to model input, overlay frame schedule, replay               |
-| `src/model/`                 | provisional contract and input mask; the model will live here    |
-| `src/model/irdashies/`       | the tire physics copied from irdashies, pinned and drift-checked |
-| `channels/channels.yaml`     | which channels are verified, with evidence                       |
-| `datasets/manifest.json`     | list of recordings (the recordings themselves are not in git)    |
-| `docs/getting-started.md`    | from an `.ibt` to a CSV; installing the package                  |
-| `docs/channels.md`           | channel reference, generated from `channels.yaml`                |
-| `docs/exe.md`                | the Windows program: open a file, switch iRacing's recording     |
-| `docs/references.md`         | reference values (dash readings) and the `score` error table     |
-| `docs/extraction-plan.md`    | how the tire model moves in, is measured, and returns            |
-| `docs/release-checklist.md`  | what to check before opening the repo and before publishing      |
-| `docs/recording-protocol.md` | how to capture a useful stint                                    |
-| `examples/`                  | runnable scripts: read a file, replay a model                    |
+| Path                     | What                                                                                |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| `src/ibt/`               | `.ibt` reader: header, var table with units, array channels                         |
+| `src/cli/`               | the command line                                                                    |
+| `src/app/`               | the local app: server, pages, file dialog, iRacing recording switch, workbench      |
+| `src/chart/`             | HTML charts: channels, model lines, tires panel, laps by distance                   |
+| `src/replay/`            | IBT to model input, overlay frame schedule, replay                                  |
+| `src/metrics/`           | error statistics and the reference-file format                                      |
+| `src/model/`             | the pure model: contract, `OverlayModel`, component registry (`tuning.ts`)          |
+| `src/model/irdashies/`   | four files of tire physics copied from irdashies, pinned and drift-checked          |
+| `src/model/surface/`     | the surface model, forked from irdashies so its constants can change                |
+| `tests/golden/`          | the real overlay processor's output on synthetic drives, which the model must equal |
+| `scripts/`               | channel docs, vendoring, golden file, package check, executable build               |
+| `channels/channels.yaml` | which channels are verified, with evidence                                          |
+| `datasets/manifest.json` | list of recordings (the recordings themselves are not in git)                       |
+| `docs/`                  | see below                                                                           |
+| `examples/`              | runnable scripts: read a file, replay a model                                       |
 
-## Roadmap
+| Doc                          | What                                                                   |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| `docs/getting-started.md`    | from an `.ibt` to charts, laps and a CSV; using the package            |
+| `docs/exe.md`                | the Windows program                                                    |
+| `docs/workbench.md`          | the model workbench: components, switches, numbers                     |
+| `docs/references.md`         | reference values (dash readings) and the `score` error table           |
+| `docs/channels.md`           | channel reference, generated from `channels.yaml`                      |
+| `docs/extraction-plan.md`    | how the model moved out of the overlay, what was checked, what is left |
+| `docs/recording-protocol.md` | how to capture a useful stint                                          |
+| `docs/release-checklist.md`  | what to check before publishing                                        |
 
-1. Reader and export (this scaffold).
-2. Establish which tire values the sim gives directly and when they update, from recordings.
-3. Deterministic replay and error metrics (MAE, RMSE, max, by wheel, zone and phase).
-4. One narrow model, judged on held-out recordings.
-5. A small package for irdashies.
+## Where this is going
+
+1. **Real recordings.** Run it on real files, promote channels to `verified`, find out which channels a car records, and measure the model against dash readings. Nothing else can say how good the model is.
+2. Move what is still in the overlay (wear, load, camber and toe, the slip estimator) into the lab, so the overlay becomes a thin adapter. See the extraction plan.
+3. If real data shows that cars or start types need their own models, make them.
+4. Offer the model to irdashies as a package. That is the overlay maintainer's decision, not this repository's.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Licence: MIT; see [NOTICE](NOTICE) for code adapted from irdashies.

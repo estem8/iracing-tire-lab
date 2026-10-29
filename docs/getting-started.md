@@ -1,6 +1,10 @@
 # Getting started
 
-Five minutes from an `.ibt` file to a CSV you can analyse. You need Node 24 or later.
+Five minutes from an `.ibt` file to a chart, the model and a CSV. You need Node 24 or later, or on Windows just the program (below).
+
+## The quick way on Windows
+
+Take `tire-lab.exe` from the artifacts of the _Windows executable_ workflow, double-click it and open a file; or drop an `.ibt` on it. You get the chart with the overlay's model, the tires drawn as the widget draws them, the laps, and the model workbench. See [exe.md](exe.md) and [workbench.md](workbench.md). Everything below does the same from a command line.
 
 ```
 git clone https://github.com/estem8/iracing-tire-lab
@@ -44,6 +48,16 @@ Without `--channels` it plots the tire channels the file has: the middle carcass
 
 Add `--model` to draw the overlay's physics beside the recording: per tire a dashed `model … carcass` line in the colour of that tire's carcass channel and a dashed `model … tread` line in the colour of its surface channel, each with its own switch (`--car`, `--hz`, `--arrival-hz` and `--mask` work as in `sample`). The model is the overlay's estimate including its pit-stop handling (checked against the real processor on synthetic drives); it needs the `*tempC` and `*wear` channels in the file, and has no slip estimator. See `docs/extraction-plan.md`.
 
+### Laps and the tires
+
+```
+npm run tire-lab -- laps session.ibt                          # the laps and their times
+npm run tire-lab -- lapchart session.ibt --lap 5              # one lap by distance, with the model
+npm run tire-lab -- lapchart session.ibt --lap 5 --compare 7  # lap 7 dashed over lap 5, and the time difference
+```
+
+With `--model` (and in lap charts) a panel above the charts draws the four tires as the overlay does, at the moment under the cursor: temperature in three zones, pressure, brake disc and tread left. Laps need the `Lap` and `LapDistPct` channels; metres are used when the file has `LapDist`. None of these channels has been seen in a real recording by this project yet.
+
 The page has been driven in a simulated browser (toggles, hover, zoom, keyboard, table view) but not yet looked at in a real one; if the layout looks wrong in yours, please open an issue.
 
 ## 4. See what a model would be given
@@ -58,22 +72,24 @@ Why both settings exist, and what is still unverified about the live set, is in 
 
 ## 5. Use it from your own code
 
-The package is not on npm yet, so install it from a tarball (installing from a git tag is not tested yet). It ships compiled JavaScript with type declarations: Node cannot run TypeScript from inside `node_modules`, so the sources are not importable.
+The package is not on npm. Install it from a git tag, which builds the compiled JavaScript and type declarations on install (Node cannot run TypeScript from inside `node_modules`, so the sources are not importable):
 
 ```
-npm run build && npm pack          # makes iracing-tire-lab-0.0.0.tgz
-npm install ../iracing-tire-lab/iracing-tire-lab-0.0.0.tgz   # in your project
+npm install "git+https://github.com/estem8/iracing-tire-lab.git#v0.2.1"
 ```
+
+That install works (it is what the irdashies experiment branch uses, and CI there runs it on Ubuntu and Windows). npm may warn that the `prepare` script is not covered by `allowScripts`; with a stricter setting the install gets no `dist`, in which case build a tarball instead: `npm run build && npm pack`.
 
 Entry points (anything else is blocked by the package `exports`):
 
-| Import                     | What                                                                        | Needs                                       |
-| -------------------------- | --------------------------------------------------------------------------- | ------------------------------------------- |
-| `iracing-tire-lab/ibt`     | read `.ibt` files, anonymize, session summary                               | Node (`node:fs`)                            |
-| `iracing-tire-lab/model`   | model contract types and the input mask                                     | nothing: pure, safe in a browser or overlay |
-| `iracing-tire-lab/replay`  | IBT to model input, overlay schedule, `replayModel`                         | Node                                        |
-| `iracing-tire-lab/chart`   | build the chart page: `buildChartData`, `addModelSeries`, `renderChartHtml` | Node                                        |
-| `iracing-tire-lab/testing` | `buildIbt`, to make synthetic files in your tests                           | Node                                        |
+| Import                     | What                                                                                                           | Needs                                       |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `iracing-tire-lab/ibt`     | read `.ibt` files, anonymize, session summary                                                                  | Node (`node:fs`)                            |
+| `iracing-tire-lab/model`   | the overlay's model (`OverlayModel`), its components (`describeTuning`), the contract types and the input mask | nothing: pure, safe in a browser or overlay |
+| `iracing-tire-lab/metrics` | error statistics, reference files, `score`                                                                     | nothing: pure                               |
+| `iracing-tire-lab/replay`  | IBT to model input, overlay schedule, `replayModel`                                                            | Node                                        |
+| `iracing-tire-lab/chart`   | build the chart page: `buildChartData`, `addModelSeries`, `renderChartHtml`                                    | Node                                        |
+| `iracing-tire-lab/testing` | `buildIbt`, to make synthetic files in your tests                                                              | Node                                        |
 
 The `tire-lab` command is installed too (`npx tire-lab inspect file.ibt`). `npm run check:package` installs the tarball into an empty project and verifies all of this.
 
