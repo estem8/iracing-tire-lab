@@ -44,6 +44,7 @@ A recording can hold more than the overlay receives, and the overlay does not gi
 | `datasets/manifest.json`     | list of recordings (the recordings themselves are not in git)    |
 | `docs/getting-started.md`    | from an `.ibt` to a CSV; installing the package                  |
 | `docs/channels.md`           | channel reference, generated from `channels.yaml`                |
+| `docs/references.md`         | reference values (dash readings) and the `score` error table     |
 | `docs/extraction-plan.md`    | how the tire model moves in, is measured, and returns            |
 | `docs/release-checklist.md`  | what to check before opening the repo and before publishing      |
 | `docs/recording-protocol.md` | how to capture a useful stint                                    |

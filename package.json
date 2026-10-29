@@ -30,6 +30,10 @@
       "types": "./dist/replay/index.d.ts",
       "default": "./dist/replay/index.js"
     },
+    "./metrics": {
+      "types": "./dist/metrics/index.d.ts",
+      "default": "./dist/metrics/index.js"
+    },
     "./testing": {
       "types": "./dist/testing.d.ts",
       "default": "./dist/testing.js"

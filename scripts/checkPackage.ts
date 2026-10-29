@@ -78,6 +78,7 @@ import { IbtFile, IbtVarType } from 'iracing-tire-lab/ibt';
 import { applyMask, EMPTY_CAR, type TireModel } from 'iracing-tire-lab/model';
 import { frames, replayModel, PRODUCTION_HZ } from 'iracing-tire-lab/replay';
 import { buildChartData, renderChartHtml } from 'iracing-tire-lab/chart';
+import { errorStats, parseReference } from 'iracing-tire-lab/metrics';
 import { buildIbt } from 'iracing-tire-lab/testing';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -109,11 +110,13 @@ const ibt = IbtFile.open(file);
 const steps = [...replayModel(model, frames(ibt), { hz: PRODUCTION_HZ, mask: 'live' })];
 const page = renderChartHtml(buildChartData(ibt, { channels: ['LFtempCM'] }));
 ibt.close();
+const stats = errorStats([1, -3]);
+const ref = parseReference(JSON.stringify({ schema: 1, source: 's', readings: [] }));
 const masked = applyMask(
   { t: 0, dt: 0, speed: null, car: EMPTY_CAR, wheels: {} as never },
   'all'
 );
-console.log(JSON.stringify({ steps: steps.length, last: steps[steps.length - 1].output, masked: masked.speed, page: page.startsWith('<!doctype html>') && page.includes('LFtempCM') }));
+console.log(JSON.stringify({ steps: steps.length, last: steps[steps.length - 1].output, masked: masked.speed, rmse: stats.rmse, refs: ref.readings.length, page: page.startsWith('<!doctype html>') && page.includes('LFtempCM') }));
 `;
 fs.writeFileSync(path.join(app, 'main.ts'), usage);
 
@@ -163,11 +166,15 @@ const result = JSON.parse(out) as {
   steps: number;
   last: { carcass: { lf?: { value: number } } };
   page: boolean;
+  rmse: number;
+  refs: number;
 };
 if (
   result.steps !== 30 ||
   result.last.carcass.lf?.value !== 61 ||
-  !result.page
+  !result.page ||
+  Math.abs(result.rmse - Math.sqrt(5)) > 1e-9 ||
+  result.refs !== 0
 ) {
   fail(`unexpected consumer output: ${out}`);
 }

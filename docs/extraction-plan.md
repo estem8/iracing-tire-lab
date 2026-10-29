@@ -77,6 +77,14 @@ Done on 2026-10-29: the five physics files are in `src/model/irdashies/`, pinned
 - The `live` mask is unchanged: it still hides only the tread temperature and hot pressure, the two channels known to be absent live. The new channels are assumed to be live because the overlay already reads them from the live SDK; that is still not checked against a dump.
 - **Not in the sample yet:** the car setup text (camber, toe), which comes from the session info, not a channel.
 
+## 4e. Milestone 4 results (run)
+
+`tire-lab score <file.ibt> --reference <file.json>` prints MAE, RMSE, largest error and bias, overall and by corner, quantity, phase and kind (format and caveats in `docs/references.md`). The model is `OverlayPhysicsModel` (the physics layer as a `TireModel`, seeded from the first carcass reading like the overlay's session start). Tested on stats with known values, strict reference parsing, matching and unmatched counting, grouping, and end to end through the CLI on a synthetic recording. `./metrics` is a new package entry point.
+
+- **Not measured on real data.** No real recording or dash reading has been through it; the only runs are synthetic. The numbers it prints are only as good as the reference file.
+- The model has no pit-stop reset (milestone 7 territory), so scores after a tire change are worse than the overlay's would be.
+- `TireOutput` gained an optional `tread`; the tread quantity compares with the surface model's tread node, not with the (unverified) tread channels.
+
 ## 5. Milestones
 
 Each is small and has an acceptance test.
@@ -84,7 +92,7 @@ Each is small and has an acceptance test.
 1. **Vendor the physics with provenance.** _Done, see 4b._ Copy the pure files of section 1 into `src/model/`, replace `@irdashies/types` with local types, keep the MIT notice in `NOTICE`, and add a script that reports drift from a pinned irdashies commit. _Accept:_ compiles; `tests/boundary.test.ts` passes (relative imports only); no `electron` or `fs`.
 2. **Equivalence with the overlay.** _Done for the physics layer, see 4c._ Run the real `TireProcessor` (bundled with esbuild, as `tire-viewer` does) over a small synthetic stimulus and commit the expected output; the lab model must reproduce it. _Accept:_ equal to within floating-point noise, on a stimulus that includes a pit stop and a session change.
 3. **Widen the input contract and the adapter.** _Done, see 4d._ Extend `TireSample` and `src/replay/samples.ts` with the channels in section 4. _Accept:_ missing channels give `null` in every test; the live mask still hides what the live SDK does not send.
-4. **Measure.** Add error metrics (MAE, RMSE, maximum, by wheel and zone, by phase) and a reference file for values that come from outside the `.ibt`, such as dash readings with their time. _Accept:_ one command prints the table for a recording and a reference file.
+4. **Measure.** _Done, see 4e._ Add error metrics (MAE, RMSE, maximum, by wheel and zone, by phase) and a reference file for values that come from outside the `.ibt`, such as dash readings with their time. _Accept:_ one command prints the table for a recording and a reference file.
 5. **Run finding 1.** Replay a non-Ferrari GT3 recording with a pit stop; compare shown vs calibrated. _Accept:_ a written result, either a confirmed discrepancy or a closed hypothesis.
 6. **Model series on the chart.** Let `tire-lab chart` plot replay output beside the recorded channels. _Accept:_ the same plot `tire-viewer` gives, with a switch per series. After this and milestone 8, `tools/tire-viewer` can be retired.
 7. **Return to the overlay.** Export the model through `iracing-tire-lab/model`; in irdashies make `TireProcessor` a thin adapter (channels in, snapshot out), delete the copies, add a contract test on a fixed synthetic sequence. _Accept:_ the widget's output is unchanged for that sequence; CI is green, including on Windows through a temporary `ci/` branch.

@@ -13,7 +13,14 @@ import { parseColumn } from '../ibt/column.ts';
 import { IbtError } from '../ibt/errors.ts';
 import { IbtFile } from '../ibt/reader.ts';
 import { anonymizeSessionYaml, summarizeSession } from '../ibt/session.ts';
+import {
+  formatScore,
+  parseReference,
+  score,
+  scoreSteps,
+} from '../metrics/index.ts';
 import type { InputMask } from '../model/mask.ts';
+import { OverlayPhysicsModel } from '../model/overlayModel.ts';
 import type { CarSample, Corner, TireSample } from '../model/types.ts';
 import {
   APP_ARRIVAL_HZ,
@@ -27,6 +34,7 @@ const USAGE = `usage:
   tire-lab export <file.ibt> --channels A,B,C --out <file.csv> [--stride N]
   tire-lab sample <file.ibt> --out <file.csv> [--hz ${PRODUCTION_HZ}] [--arrival-hz ${APP_ARRIVAL_HZ}] [--mask live|all]
   tire-lab chart <file.ibt> --out <chart.html> [--channels A,B,C] [--max-points 5000 | --stride N]
+  tire-lab score <file.ibt> --reference <reference.json> [--car <car path>] [--max-gap 1] [--hz ${PRODUCTION_HZ}] [--arrival-hz ${APP_ARRIVAL_HZ}] [--mask live|all] [--json]
   tire-lab anonymize <in.ibt> <out.ibt>`;
 
 const flag = (args: string[], name: string): string | undefined => {
@@ -207,6 +215,50 @@ const sample = (args: string[]): void => {
   }
 };
 
+/** Runs the overlay's physics over a recording and prints its error against a reference file. */
+const scoreCommand = (args: string[]): void => {
+  const referencePath = flag(args, '--reference');
+  const hz = Number(flag(args, '--hz') ?? PRODUCTION_HZ);
+  const arrivalHz = Number(flag(args, '--arrival-hz') ?? APP_ARRIVAL_HZ);
+  const maxGapS = Number(flag(args, '--max-gap') ?? 1);
+  const mask = (flag(args, '--mask') ?? 'live') as InputMask;
+  if (
+    !referencePath ||
+    !(hz > 0) ||
+    !(arrivalHz > 0) ||
+    !(maxGapS >= 0) ||
+    (mask !== 'live' && mask !== 'all')
+  ) {
+    throw new Error(USAGE);
+  }
+  const reference = parseReference(fs.readFileSync(referencePath, 'utf8'));
+  const file = IbtFile.open(args[0]);
+  try {
+    const car =
+      flag(args, '--car') ??
+      reference.car ??
+      summarizeSession(file.sessionYaml).carPath;
+    const steps = scoreSteps(new OverlayPhysicsModel(car), frames(file), {
+      hz,
+      arrivalHz,
+      mask,
+    });
+    const result = score(steps, reference, { maxGapS });
+    if (args.includes('--json')) {
+      console.log(JSON.stringify({ car: car ?? null, ...result }, null, 2));
+      return;
+    }
+    console.log(
+      `model overlay-physics, car ${car ?? 'unknown (default profile)'}, ` +
+        `${steps.length} steps (${arrivalHz} Hz arrival, ${hz} Hz tick, ${mask})`,
+    );
+    console.log(`reference: ${reference.source}`);
+    console.log(formatScore(result));
+  } finally {
+    file.close();
+  }
+};
+
 /** One HTML file with a chart per unit and a switch per series; open it in a browser. */
 const chart = (args: string[]): void => {
   const out = flag(args, '--out');
@@ -271,6 +323,7 @@ const main = (): void => {
     if (command === 'export' && args[0]) return exportCsv(args);
     if (command === 'sample' && args[0]) return sample(args);
     if (command === 'chart' && args[0]) return chart(args);
+    if (command === 'score' && args[0]) return scoreCommand(args);
     if (command === 'anonymize') return anonymize(args);
     console.error(USAGE);
     process.exitCode = 2;

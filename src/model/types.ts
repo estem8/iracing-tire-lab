@@ -92,6 +92,8 @@ export interface Estimate<T> {
 
 export interface TireOutput {
   carcass: Partial<Record<Corner, Estimate<number>>>;
+  /** Tread surface temperature, where the model has one. */
+  tread?: Partial<Record<Corner, Estimate<number>>>;
 }
 
 export interface TireModel {
