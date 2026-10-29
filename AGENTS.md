@@ -1,6 +1,7 @@
 # Notes for coding agents
 
-- Node >= 24 runs the TypeScript directly. No build step, no runtime dependencies. Imports use `.ts` extensions; no `enum`, no parameter properties (`erasableSyntaxOnly`).
+- Node >= 24 runs the TypeScript directly in development (no build step to run tests or the CLI), and there are no runtime dependencies. Imports use `.ts` extensions; no `enum`, no parameter properties (`erasableSyntaxOnly`).
+- Package: `npm run build` emits `dist/` (JS + types; Node cannot strip types under `node_modules`). `npm run check:package` installs the tarball into an empty project; run it when you change `exports` or entry points. Consumers can only import `./ibt`, `./model`, `./replay`, `./testing`.
 - Test: `npm test`. Types: `npm run typecheck`. Format: `npm run format:check`.
 - Never add or commit `.ibt`, `.irdt` or any real recording. Fixtures are built with `src/ibt/testBuilder.ts`.
 - `src/model/` must stay pure: relative imports only. `tests/boundary.test.ts` checks it.

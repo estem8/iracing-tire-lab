@@ -36,7 +36,7 @@ A recording can hold more than the overlay receives, and the overlay runs its ti
 | `src/model/`                 | provisional contract and input mask; the model will live here |
 | `channels/channels.yaml`     | which channels are verified, with evidence                    |
 | `datasets/manifest.json`     | list of recordings (the recordings themselves are not in git) |
-| `docs/getting-started.md`    | from an `.ibt` to a CSV in five minutes                       |
+| `docs/getting-started.md`    | from an `.ibt` to a CSV; installing the package               |
 | `docs/channels.md`           | channel reference, generated from `channels.yaml`             |
 | `docs/recording-protocol.md` | how to capture a useful stint                                 |
 | `examples/`                  | runnable scripts: read a file, replay a model                 |

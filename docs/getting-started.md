@@ -44,7 +44,25 @@ Why both settings exist, and what is still unverified about the live set, is in 
 
 ## 4. Use it from your own code
 
-The library is not yet published as a package, so import from the source files for now. Two runnable examples:
+The package is not on npm yet, so install it from a tarball (installing from a git tag is not tested yet). It ships compiled JavaScript with type declarations: Node cannot run TypeScript from inside `node_modules`, so the sources are not importable.
+
+```
+npm run build && npm pack          # makes iracing-tire-lab-0.0.0.tgz
+npm install ../iracing-tire-lab/iracing-tire-lab-0.0.0.tgz   # in your project
+```
+
+Entry points (anything else is blocked by the package `exports`):
+
+| Import                     | What                                              | Needs                                       |
+| -------------------------- | ------------------------------------------------- | ------------------------------------------- |
+| `iracing-tire-lab/ibt`     | read `.ibt` files, anonymize, session summary     | Node (`node:fs`)                            |
+| `iracing-tire-lab/model`   | model contract types and the input mask           | nothing: pure, safe in a browser or overlay |
+| `iracing-tire-lab/replay`  | IBT to model input, 15 Hz schedule, `replayModel` | Node                                        |
+| `iracing-tire-lab/testing` | `buildIbt`, to make synthetic files in your tests | Node                                        |
+
+The `tire-lab` command is installed too (`npx tire-lab inspect file.ibt`). `npm run check:package` installs the tarball into an empty project and verifies all of this.
+
+Two runnable examples, which import from the source files because they live in this repository:
 
 - [`examples/read-channels.ts`](../examples/read-channels.ts): open a file, list channels with units, read a scalar and an array element.
 - [`examples/replay-a-model.ts`](../examples/replay-a-model.ts): replay a model at 15 Hz with the live mask. The model in it is a smoothing filter that only shows the API.
