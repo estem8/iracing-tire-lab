@@ -10,10 +10,16 @@ import { formatValue, readVarValue } from '../ibt/binary.ts';
 import { IbtError } from '../ibt/errors.ts';
 import { IbtFile } from '../ibt/reader.ts';
 import { anonymizeSessionYaml, summarizeSession } from '../ibt/session.ts';
+import { applyMask, type InputMask } from '../model/mask.ts';
+import type { Corner, TireSample } from '../model/types.ts';
+import { PRODUCTION_HZ } from '../replay/replay.ts';
+import { frames } from '../replay/samples.ts';
+import { resample } from '../replay/schedule.ts';
 
 const USAGE = `usage:
   tire-lab inspect <file.ibt> [--json]
   tire-lab export <file.ibt> --channels A,B,C --out <file.csv> [--stride N]
+  tire-lab sample <file.ibt> --out <file.csv> [--hz ${PRODUCTION_HZ}] [--mask live|all]
   tire-lab anonymize <in.ibt> <out.ibt>`;
 
 const flag = (args: string[], name: string): string | undefined => {
@@ -103,6 +109,66 @@ const exportCsv = (args: string[]): void => {
   }
 };
 
+const CORNER_ORDER: Corner[] = ['lf', 'rf', 'lr', 'rr'];
+
+/** The CSV header and cells of one model input sample; null is an empty cell. */
+const sampleColumns = (): string[] => [
+  't',
+  'dt',
+  'speed',
+  ...CORNER_ORDER.flatMap((c) => [
+    ...['L', 'M', 'R'].map((z) => `${c}.carcass${z}`),
+    ...['L', 'M', 'R'].map((z) => `${c}.surface${z}`),
+    ...['L', 'M', 'R'].map((z) => `${c}.wear${z}`),
+    `${c}.coldKpa`,
+    `${c}.hotKpa`,
+  ]),
+];
+const cell = (v: number | null): string => (v === null ? '' : String(v));
+const sampleCells = (s: TireSample): string[] => [
+  String(s.t),
+  String(s.dt),
+  cell(s.speed),
+  ...CORNER_ORDER.flatMap((c) => {
+    const w = s.wheels[c];
+    return [
+      ...[0, 1, 2].map((i) => cell(w.carcass?.[i] ?? null)),
+      ...[0, 1, 2].map((i) => cell(w.surface?.[i] ?? null)),
+      ...[0, 1, 2].map((i) => cell(w.treadRemaining?.[i] ?? null)),
+      cell(w.coldPressureKpa),
+      cell(w.hotPressureKpa),
+    ];
+  }),
+];
+
+/** Writes what a model would be given at the overlay's rate: the lab's input contract, as CSV. */
+const sample = (args: string[]): void => {
+  const out = flag(args, '--out');
+  const hz = Number(flag(args, '--hz') ?? PRODUCTION_HZ);
+  const mask = (flag(args, '--mask') ?? 'live') as InputMask;
+  if (!out || !(hz > 0) || (mask !== 'live' && mask !== 'all')) {
+    throw new Error(USAGE);
+  }
+  const file = IbtFile.open(args[0]);
+  try {
+    const lines = [sampleColumns().join(',')];
+    let previous: number | undefined;
+    for (const frame of resample(frames(file), hz)) {
+      const dt = previous === undefined ? 0 : frame.sample.t - previous;
+      previous = frame.sample.t;
+      lines.push(
+        sampleCells(applyMask({ ...frame.sample, dt }, mask)).join(','),
+      );
+    }
+    fs.writeFileSync(out, lines.join('\n') + '\n');
+    console.log(
+      `wrote ${lines.length - 1} samples at ${hz} Hz (${mask}) to ${out}`,
+    );
+  } finally {
+    file.close();
+  }
+};
+
 const anonymize = (args: string[]): void => {
   const [input, output] = args;
   if (!input || !output) throw new Error(USAGE);
@@ -131,6 +197,7 @@ const main = (): void => {
   try {
     if (command === 'inspect' && args[0]) return inspect(args);
     if (command === 'export' && args[0]) return exportCsv(args);
+    if (command === 'sample' && args[0]) return sample(args);
     if (command === 'anonymize') return anonymize(args);
     console.error(USAGE);
     process.exitCode = 2;
