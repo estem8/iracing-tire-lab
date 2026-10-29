@@ -125,6 +125,10 @@ export interface TireOutput {
   tread?: Partial<Record<Corner, Estimate<number>>>;
   /** What an overlay would display per tire (left, middle, right zone), where a model has such a thing. */
   shown?: Partial<Record<Corner, Estimate<Zones>>>;
+  /** The pressure an overlay would label a tire with: kPa, whether it is a hot value, and whether it is calculated. */
+  pressure?: Partial<
+    Record<Corner, { kpa: number; hot: boolean; estimated: boolean }>
+  >;
 }
 
 export interface TireModel {

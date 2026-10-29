@@ -20,7 +20,28 @@ export interface ChartSeries {
   like?: string;
 }
 
+/** What one tire looks like at each point of the chart. Null where unknown. */
+export interface TireCornerSeries {
+  /** Left, middle and right zone of the shown (model) temperature, deg C. */
+  temp: [(number | null)[], (number | null)[], (number | null)[]];
+  /** The model's tread surface temperature, deg C. */
+  tread: (number | null)[];
+  /** Pressure, kPa, and whether each value is calculated (1) or not (0). */
+  pressure: (number | null)[];
+  pressureEstimated: (number | null)[];
+  /** The sim's own reading of tread left, percent, per zone: frozen between stops. */
+  wear: [(number | null)[], (number | null)[], (number | null)[]];
+}
+
+export interface TirePanel {
+  corners: Record<'lf' | 'rf' | 'lr' | 'rr', TireCornerSeries>;
+}
+
 export interface ChartData {
+  /** The tires at each point, for the panel beside the charts; absent when there is no model. */
+  tires?: TirePanel;
+  /** The record behind each point of x; the tire panel is filled from these. */
+  pointRecords?: number[];
   /** Car, track and air temperature: no personal fields. */
   title: string;
   tickRate: number;
@@ -96,6 +117,7 @@ export const buildChartData = (
   );
   const timeHeader = file.channel('SessionTime');
   const x: number[] = [];
+  const used: number[] = [];
   const series: ChartSeries[] = specs.map((name, i) => ({
     name,
     unit: headers[i].unit,
@@ -103,6 +125,7 @@ export const buildChartData = (
   }));
 
   for (let r = 0; r < records; r += stride) {
+    used.push(r);
     const rec = file.readRecord(r);
     x.push(
       timeHeader
@@ -138,5 +161,6 @@ export const buildChartData = (
     xName,
     x,
     series,
+    pointRecords: used,
   };
 };

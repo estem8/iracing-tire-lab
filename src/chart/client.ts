@@ -259,6 +259,60 @@ export const CLIENT_SCRIPT = String.raw`
     var C = colors();
     panels.forEach(function (p) { draw(p, C); });
     updateTips();
+    updateTires();
+  }
+
+  /* ---------- the tires at the cursor ---------- */
+  var TIRE_NAMES = { lf: 'Left front', rf: 'Right front', lr: 'Left rear', rr: 'Right rear' };
+  var TIRE_ORDER = ['lf', 'rf', 'lr', 'rr'];
+  var tireCells = {};
+  var tiresHead = null;
+  // Cold to hot, one ramp; the number is always printed, the colour only helps the eye.
+  function tempColor(v) {
+    var t = Math.min(1, Math.max(0, (v - 30) / 80));
+    return 'hsl(' + Math.round(220 - 210 * t) + ', 65%, 36%)';
+  }
+  function buildTires() {
+    if (!DATA.tires) return;
+    var box = document.getElementById('tires');
+    box.hidden = false;
+    tiresHead = el('h2', 'unit', 'Tires');
+    box.appendChild(tiresHead);
+    box.appendChild(el('p', 'tires-note', 'Temperatures and pressure are the overlay model\u2019s estimate. Wear is the sim\u2019s own last reading, which changes only at pit stops. Move over a chart to read another moment.'));
+    var grid = el('div', 'tire-grid');
+    TIRE_ORDER.forEach(function (c) {
+      var card = el('div', 'tire');
+      card.appendChild(el('div', 'tire-name', TIRE_NAMES[c]));
+      var zones = el('div', 'zones');
+      var cells = { zone: [], tread: el('div', 'tire-line'), pressure: el('div', 'tire-line'), wear: el('div', 'tire-line') };
+      for (var k = 0; k < 3; k++) { var z = el('div', 'zone', '\u2013'); cells.zone.push(z); zones.appendChild(z); }
+      card.appendChild(zones);
+      card.appendChild(cells.tread); card.appendChild(cells.pressure); card.appendChild(cells.wear);
+      tireCells[c] = cells;
+      grid.appendChild(card);
+    });
+    box.appendChild(grid);
+    updateTires();
+  }
+  function updateTires() {
+    if (!DATA.tires) return;
+    var i = state.cursor >= 0 ? state.cursor : 0;
+    tiresHead.textContent = 'Tires at ' + (DATA.xLabel || 'Time').toLowerCase() + ' ' + X[i].toFixed(1) + ' ' + (DATA.xUnit || 's');
+    TIRE_ORDER.forEach(function (c) {
+      var d = DATA.tires.corners[c], cells = tireCells[c];
+      for (var k = 0; k < 3; k++) {
+        var v = d.temp[k][i], z = cells.zone[k];
+        z.textContent = v === null ? '\u2013' : Math.round(v) + '\u00b0';
+        z.style.background = v === null ? '' : tempColor(v);
+        z.style.color = v === null ? '' : '#fff';
+      }
+      var tr = d.tread[i];
+      cells.tread.textContent = 'tread surface ' + (tr === null ? '\u2013' : Math.round(tr) + '\u00b0 C');
+      var pr = d.pressure[i];
+      cells.pressure.textContent = 'pressure ' + (pr === null ? '\u2013' : pr.toFixed(1) + ' kPa' + (d.pressureEstimated[i] === 1 ? ' (calculated)' : ''));
+      var w = [d.wear[0][i], d.wear[1][i], d.wear[2][i]];
+      cells.wear.textContent = 'tread left ' + (w.some(function (x) { return x === null; }) ? '\u2013' : w.map(function (x) { return Math.round(x); }).join(' \u00b7 ') + ' %');
+    });
   }
 
   /* ---------- building the page ---------- */
@@ -412,6 +466,7 @@ export const CLIENT_SCRIPT = String.raw`
     (DATA.stride > 1 ? ' (every ' + DATA.stride + ' records of ' + DATA.records + '; a spike narrower than that can fall between points)' : ' (every record)') +
     '. Recorded at ' + DATA.tickRate + ' Hz. x: ' + DATA.xName + ', ' + (DATA.xUnit === '%' ? 'percent of the lap' : DATA.xUnit === 'm' ? 'metres along the lap' : 'seconds') + '.';
 
+  buildTires();
   var chartsEl = document.getElementById('charts');
   panels.forEach(function (p) { chartsEl.appendChild(buildPanel(p)); });
   buildTable();

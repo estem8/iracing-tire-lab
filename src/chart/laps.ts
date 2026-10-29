@@ -177,6 +177,7 @@ export const buildLapChart = (
   // Per lap: distance, clock, each channel and (one lap only) the model, by record.
   const perLap = laps.map((lap) => {
     const xs: number[] = [];
+    const recs: number[] = [];
     const ts: number[] = [];
     const values: (number | null)[][] = specs.map(() => []);
     const model = new Map<string, (number | null)[]>();
@@ -196,6 +197,7 @@ export const buildLapChart = (
       )
         continue;
       xs.push(x);
+      recs.push(r);
       ts.push(t - lap.startS);
       headers.forEach((h, i) => {
         const v = readVarValue(rec, h, columns[i].index);
@@ -212,7 +214,7 @@ export const buildLapChart = (
           }
       }
     }
-    return { lap, xs, ts, values, model };
+    return { lap, xs, recs, ts, values, model };
   });
 
   const lo = Math.max(...perLap.map((p) => p.xs[0] ?? Infinity));
@@ -291,5 +293,17 @@ export const buildLapChart = (
     xUnit: unit,
     x: grid.map(round) as number[],
     series,
+    // The tires beside the chart follow the first lap: its record nearest each grid point.
+    pointRecords: grid.map((g) => {
+      const p = perLap[0];
+      let a = 0;
+      let b = p.xs.length - 1;
+      while (a < b) {
+        const m = (a + b) >> 1;
+        if (p.xs[m] < g) a = m + 1;
+        else b = m;
+      }
+      return p.recs[a > 0 && g - p.xs[a - 1] < p.xs[a] - g ? a - 1 : a];
+    }),
   };
 };

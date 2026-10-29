@@ -363,3 +363,19 @@ test('tire-lab laps lists the laps, and lapchart writes a lap page', async () =>
   );
   fs.rmSync(file);
 });
+
+test('the chart and lap pages carry the tire panel', async () => {
+  const { writeLapsIbt } = await import('./helpers/syntheticIbt.ts');
+  await withServer(async (server) => {
+    const file = writeLapsIbt();
+    await post(server, '/api/open', { path: file });
+    for (const url of ['/chart', '/lapchart?a=2']) {
+      const page = (await get(server, url)).body;
+      assert.match(page, /<section id="tires" hidden>/);
+      assert.match(page, /"tires":\{"corners":\{"lf"/);
+    }
+    // Comparing two laps: the panel follows the first.
+    assert.match((await get(server, '/lapchart?a=2&b=1')).body, /"tires":/);
+    fs.rmSync(file);
+  });
+});

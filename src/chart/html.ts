@@ -78,6 +78,15 @@ table { width: 100%; border-collapse: collapse; background: var(--surface); bord
 th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--grid); }
 th[scope="col"] { color: var(--muted); font-weight: 500; font-size: 12px; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
+#tires { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; }
+#tires h2 { margin: 0 0 4px; }
+.tires-note { color: var(--ink2); font-size: 12px; margin: 0 0 10px; }
+.tire-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 520px; }
+.tire { border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
+.tire-name { font-size: 12px; font-weight: 600; color: var(--ink2); margin-bottom: 4px; }
+.zones { display: flex; gap: 2px; }
+.zone { flex: 1; text-align: center; padding: 10px 0; font-weight: 600; font-variant-numeric: tabular-nums; border-radius: 3px; background: var(--grid); color: var(--ink); }
+.tire-line { font-size: 12px; color: var(--ink2); margin-top: 4px; font-variant-numeric: tabular-nums; }
 [hidden] { display: none !important; }
 `;
 
@@ -98,6 +107,7 @@ export const renderChartHtml = (data: ChartData): string => `<!doctype html>
     <button type="button" id="table-toggle" aria-pressed="false">Table view</button>
     <span class="hint">Tick a series to show or hide it. Drag on a chart to zoom, double-click to reset. With a chart focused, arrow keys read values.</span>
   </div>
+  <section id="tires" hidden></section>
   <div id="charts"></div>
   <section id="table" hidden>
     <table>

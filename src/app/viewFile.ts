@@ -1,6 +1,7 @@
 import {
   addModelSeries,
   buildChartData,
+  addTirePanel,
   buildLapChart,
   findLaps,
   renderChartHtml,
@@ -47,7 +48,7 @@ export const renderFilePage = (path: string): FilePage => {
         arrivalHz: APP_ARRIVAL_HZ,
         mask: 'live',
       });
-      data = addModelSeries(data, steps);
+      data = addTirePanel(addModelSeries(data, steps), file, steps);
     } catch (e) {
       note = `The model could not be drawn: ${(e as Error).message}`;
     }
@@ -85,7 +86,13 @@ export const renderLapPage = (
   const picked = lapB === undefined ? [find(lapA)] : [find(lapA), find(lapB)];
   const file = IbtFile.open(path);
   try {
-    return renderChartHtml(buildLapChart(file, picked, { steps: page.steps }));
+    return renderChartHtml(
+      addTirePanel(
+        buildLapChart(file, picked, { steps: page.steps }),
+        file,
+        page.steps,
+      ),
+    );
   } finally {
     file.close();
   }

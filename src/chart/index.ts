@@ -5,6 +5,8 @@ export {
   type ChartData,
   type ChartOptions,
   type ChartSeries,
+  type TireCornerSeries,
+  type TirePanel,
 } from './data.ts';
 export { renderChartHtml } from './html.ts';
 export { addModelSeries, type ModelSeriesOptions } from './model.ts';
@@ -14,3 +16,4 @@ export {
   type Lap,
   type LapChartOptions,
 } from './laps.ts';
+export { addTirePanel } from './tires.ts';

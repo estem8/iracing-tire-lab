@@ -344,6 +344,7 @@ export class OverlayModel implements TireModel {
       carcass: {},
       tread: {},
       shown: {},
+      pressure: {},
       events: this.events,
     };
     this.shown = {};
@@ -378,6 +379,12 @@ export class OverlayModel implements TireModel {
           corner.disc = Math.round(physics.surface.discLevel(c) * 20) / 20;
       }
       this.shown[c] = corner;
+      if (corner.pressure !== undefined)
+        out.pressure![c] = {
+          kpa: corner.pressure,
+          hot: corner.pressureHot === true,
+          estimated: corner.pressureEstimated === true,
+        };
       out.shown![c] = { kind: 'estimate', model: label, value: temp3 };
       if (modelled !== undefined && Number.isFinite(modelled))
         out.carcass[c] = estimate(modelled);

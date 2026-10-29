@@ -145,3 +145,54 @@ test('a bad choice of laps is refused with a reason', () => {
   assert.match(html, /Distance/);
   fs.rmSync(file);
 });
+
+test("the tire panel: model zones, pressure and the sim's wear at each point; a lap chart follows the first lap", async () => {
+  const { addTirePanel } = await import('../src/chart/tires.ts');
+  const { buildChartData } = await import('../src/chart/data.ts');
+  const file = writeLapsIbt();
+  const page = renderFilePage(file);
+  const data = open(file, (f) =>
+    addTirePanel(buildChartData(f), f, page.steps),
+  );
+  assert.ok(data.tires);
+  const lf = data.tires.corners.lf;
+  assert.equal(lf.temp[0].length, data.x.length);
+  const at = Math.floor(data.x.length / 2);
+  // The model has stepped by the middle of the drive: zones, tread and pressure are numbers.
+  assert.ok(lf.temp.every((z) => typeof z[at] === 'number'));
+  assert.equal(typeof lf.tread[at], 'number');
+  // The fixture's wear reading is 0.97 in every zone: 97 per cent, the sim's, not an estimate.
+  assert.deepEqual(
+    lf.wear.map((z) => z[at]),
+    [97, 97, 97],
+  );
+  // No coldPressure channel in the fixture: pressure is unknown, not 0.
+  assert.equal(lf.pressure[at], null);
+
+  const lap = page.laps.find((l) => l.lap === 2)!;
+  const lapData = open(file, (f) =>
+    addTirePanel(buildLapChart(f, [lap], { steps: page.steps }), f, page.steps),
+  );
+  assert.equal(lapData.pointRecords!.length, 1000);
+  assert.ok(
+    lapData.pointRecords!.every((r, i, a) => i === 0 || r >= a[i - 1]),
+    'records follow the lap in order',
+  );
+  assert.ok(
+    lapData.pointRecords![0] >= lap.first &&
+      lapData.pointRecords![999] <= lap.last,
+  );
+  assert.ok(
+    lapData.tires!.corners.rr.temp[1].some((v) => typeof v === 'number'),
+  );
+  fs.rmSync(file);
+});
+
+test('without steps the panel is not added', async () => {
+  const { addTirePanel } = await import('../src/chart/tires.ts');
+  const { buildChartData } = await import('../src/chart/data.ts');
+  const file = writeLapsIbt();
+  const data = open(file, (f) => addTirePanel(buildChartData(f), f, []));
+  assert.equal(data.tires, undefined);
+  fs.rmSync(file);
+});
