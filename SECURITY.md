@@ -11,10 +11,10 @@ This is a small project maintained on a best-effort basis. There is no guarantee
 
 ## What counts
 
-This tool reads files you may have received from other people, and it is meant to remove personal data from them, so these matter:
+This tool reads files you may have received from other people, and it can blank some of the personal data in them, so these matter:
 
 - A crafted `.ibt` that makes the reader crash, hang, read outside its buffers or use unbounded memory. The reader bounds every size taken from the header and checks it against the file, but it has not been fuzzed.
-- `tire-lab anonymize` leaving a name, user id, iRating or similar in a file it says it redacted. Treat this as a privacy vulnerability.
+- `tire-lab anonymize` leaving a name, user id, iRating or similar in a file it says it redacted. It is a best-effort tool, not a guarantee, and has not been verified on a real recording; a field it misses is still worth reporting, and we treat it as a privacy vulnerability.
 - A flaw in the build, package or CI setup that could let someone ship altered code.
 
 Not in scope: how accurate the tire model is, and anything in iRacing itself.

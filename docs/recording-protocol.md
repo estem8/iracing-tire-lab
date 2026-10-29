@@ -11,4 +11,4 @@ One stint is enough to be useful. The point is to capture what the game shows at
    `npm run tire-lab -- export your.ibt --channels SessionTime,Speed,LFtempCL,... --stride 3 --out stint.csv`
    This also writes `stint.meta.json` with the car, track and weather, and no personal fields.
 
-Do not share the raw `.ibt`. It holds your name, user id, iRating and the names of other drivers. If a maintainer asks for the raw file, run `tire-lab anonymize in.ibt out.ibt` first and open the result with `inspect` to check.
+Do not share the raw `.ibt`. It holds your name, user id, iRating and the names of other drivers. If a maintainer asks for the raw file, `tire-lab anonymize in.ibt out.ibt` blanks the personal fields it knows about, but it is best effort and not yet verified on a real recording: read the whole result with `tire-lab inspect out.ibt --session` before sending it. It does not remove the session date, track, car or lap times.

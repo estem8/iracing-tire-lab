@@ -161,7 +161,13 @@ test('cli: export writes a CSV and a sidecar, anonymize yields a readable file',
   assert.equal(meta.session.carPath, 'ferrari296gt3');
 
   const anon = path.join(dir, 'anon.ibt');
-  execFileSync('node', [cli, 'anonymize', input, anon]);
+  execFileSync('node', [cli, 'anonymize', input, anon], { stdio: 'pipe' });
+  // `inspect --session` prints the raw YAML, so what is left can be read.
+  const shown = execFileSync('node', [cli, 'inspect', anon, '--session'], {
+    encoding: 'utf8',
+  });
+  assert.ok(!shown.includes('Jane') && !shown.includes('2500'));
+  assert.ok(shown.includes('CarPath: ferrari296gt3'));
   const file = IbtFile.open(anon);
   try {
     assert.ok(!file.sessionYaml.includes('Jane'));

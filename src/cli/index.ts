@@ -3,7 +3,7 @@
  * iracing-tire-lab CLI.
  *   inspect   <file.ibt>                          channels, units, session summary
  *   export    <file.ibt> --channels A,B --out x.csv [--stride N]
- *   anonymize <in.ibt> <out.ibt>                  same-length redaction of personal fields
+ *   anonymize <in.ibt> <out.ibt>                  best-effort same-length redaction of personal fields
  */
 import fs from 'node:fs';
 import { formatValue, readVarValue } from '../ibt/binary.ts';
@@ -20,7 +20,7 @@ import {
 import { frames } from '../replay/samples.ts';
 
 const USAGE = `usage:
-  tire-lab inspect <file.ibt> [--json]
+  tire-lab inspect <file.ibt> [--json | --session]
   tire-lab export <file.ibt> --channels A,B,C --out <file.csv> [--stride N]
   tire-lab sample <file.ibt> --out <file.csv> [--hz ${PRODUCTION_HZ}] [--arrival-hz ${APP_ARRIVAL_HZ}] [--mask live|all]
   tire-lab anonymize <in.ibt> <out.ibt>`;
@@ -33,6 +33,11 @@ const flag = (args: string[], name: string): string | undefined => {
 const inspect = (args: string[]): void => {
   const file = IbtFile.open(args[0]);
   try {
+    // The raw session text, to review by eye what a file still says about people.
+    if (args.includes('--session')) {
+      console.log(file.sessionYaml);
+      return;
+    }
     const session = summarizeSession(file.sessionYaml);
     if (args.includes('--json')) {
       console.log(
@@ -193,7 +198,11 @@ const anonymize = (args: string[]): void => {
   } finally {
     fs.closeSync(fd);
   }
-  console.log(`wrote ${output}; check it with: tire-lab inspect ${output}`);
+  console.log(`wrote ${output}`);
+  console.error(
+    'Best effort, not verified on real recordings: it only blanks known fields. ' +
+      `Read the result before sharing it: tire-lab inspect ${output} --session`,
+  );
 };
 
 const main = (): void => {

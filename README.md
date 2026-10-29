@@ -13,9 +13,11 @@ npm install
 npm run tire-lab -- inspect session.ibt            # channels, units, session summary
 npm run tire-lab -- export session.ibt --channels SessionTime,Speed,LFtempCL --out stint.csv --stride 3
 npm run tire-lab -- sample session.ibt --out input.csv   # what a model would be given: 20 Hz frames, 15 Hz ticks, live inputs only
-npm run tire-lab -- anonymize in.ibt out.ibt       # same-length redaction of names and ids
+npm run tire-lab -- anonymize in.ibt out.ibt       # best-effort redaction of names and ids; read the result
 npm test
 ```
+
+`anonymize` is best effort. It blanks the fields it knows (names, user and team ids, iRating, session ids) and has not yet been checked on a real recording. It does not remove the session date, track, car or lap times, which can identify a session. To share data, prefer a CSV from `export`, and read any anonymized file with `inspect <file> --session` before sharing it.
 
 ## Judging a model the way the overlay would run it
 

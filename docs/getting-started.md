@@ -71,4 +71,6 @@ Run either with `node examples/<name>.ts`. They build a small synthetic file, so
 
 ## 5. Share a file safely
 
-An `.ibt` contains your name, user id, iRating and the names of the other drivers in the session. Do not post it. Share the CSV and its `.meta.json` instead, or run `tire-lab anonymize in.ibt out.ibt` and check the result with `inspect`. See [recording-protocol.md](recording-protocol.md).
+An `.ibt` contains your name, user id, iRating and the names of the other drivers in the session. Do not post it. Share the CSV and its `.meta.json` instead.
+
+If you must share the raw file, `tire-lab anonymize in.ibt out.ibt` blanks the fields it knows about, but it is best effort and has not been checked on a real recording, so do not rely on it. It does not touch the session date, track, car or lap times, which can identify a session. Read the result before sharing it with `tire-lab inspect out.ibt --session`, which prints the full session text (plain `inspect` shows only a summary without personal fields, so it cannot tell you what is left). See [recording-protocol.md](recording-protocol.md).

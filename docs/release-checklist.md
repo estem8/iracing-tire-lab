@@ -16,7 +16,7 @@ The repository was made public on 2026-10-29 with the items below still open: th
 
 - [x] **CI is on `main` and green** (run on commit `ea1505c`, Ubuntu, Node 24). It runs format check, typecheck, tests, `check:package` and the no-recordings check; every step passed.
 - [ ] **Run on a real recording.** `inspect`, `export`, `sample` and `anonymize` have only been run on synthetic files. Compare the channel list and units with `channels/channels.yaml`, promote what is seen to `verified`, and run `npm run docs`.
-- [ ] **Check `anonymize` on a real file.** Open the result and confirm no names or ids remain, including other drivers in the session. The redaction list comes from irdashies' code, not from the full YAML a real file contains.
+- [ ] **Check `anonymize` on a real file.** Read the whole result with `inspect <file> --session` (plain `inspect` shows only a summary, so it cannot show what is left) and confirm no names or ids remain, including other drivers in the session. The redaction list comes from irdashies' code, not from the full YAML a real file contains.
 - [ ] **Run on Windows.** The CLI and file reading have only been run on Linux.
 - [x] `SECURITY.md` added. It points to GitHub's private report and, if that is missing, to a contentless issue asking for a private channel.
 - [x] Private vulnerability reporting enabled when the repository was made public on 2026-10-29 (it is not available while private).
