@@ -12,6 +12,7 @@ Needs Node >= 24. New here? Start with [docs/getting-started.md](docs/getting-st
 npm install
 npm run tire-lab -- inspect session.ibt            # channels, units, session summary
 npm run tire-lab -- export session.ibt --channels SessionTime,Speed,LFtempCL --out stint.csv --stride 3
+npm run tire-lab -- chart session.ibt --out chart.html   # open in a browser; a switch per series
 npm run tire-lab -- sample session.ibt --out input.csv   # what a model would be given: 20 Hz frames, 15 Hz ticks, live inputs only
 npm run tire-lab -- anonymize in.ibt out.ibt       # best-effort redaction of names and ids; read the result
 npm test
@@ -34,7 +35,8 @@ A recording can hold more than the overlay receives, and the overlay does not gi
 | Path                         | What                                                          |
 | ---------------------------- | ------------------------------------------------------------- |
 | `src/ibt/`                   | `.ibt` reader: header, var table with units, array channels   |
-| `src/cli/`                   | `inspect`, `export`, `sample`, `anonymize`                    |
+| `src/cli/`                   | `inspect`, `export`, `chart`, `sample`, `anonymize`           |
+| `src/chart/`                 | HTML chart of channels with a switch per series               |
 | `src/replay/`                | IBT to model input, overlay frame schedule, replay            |
 | `src/model/`                 | provisional contract and input mask; the model will live here |
 | `channels/channels.yaml`     | which channels are verified, with evidence                    |

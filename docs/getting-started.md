@@ -32,7 +32,19 @@ npm run tire-lab -- export session.ibt \
 
 Floats are written as the shortest text that reads back to the exact same value, so exporting does not change a number.
 
-## 3. See what a model would be given
+## 3. Look at the channels in a browser
+
+```
+npm run tire-lab -- chart session.ibt --out chart.html
+```
+
+Open `chart.html` in any browser. It is one file with no outside requests. There is one chart per unit (so temperatures, speeds and percentages never share an axis), and every series has a tick box: untick it to hide it, `None` and `All` do it for a whole chart. Drag on a chart to zoom, double-click to reset, hover to read every visible series at that time, or focus a chart and use the arrow keys. `Table view` lists each series with its point count, missing values, min, mean and max.
+
+Without `--channels` it plots the tire channels the file has: the middle carcass and middle surface temperature of each tire, speed, throttle and brake. Name your own with `--channels LFtempCL,LFtempCM,Speed,Shock[2]`. Files are thinned to 5000 points per series (`--max-points`, or `--stride N`; `--stride 1` plots every record), so a spike narrower than the step can fall between points. A value the file cannot give is a gap in the line, never a zero. Series in the same chart past the eighth share one grey, and the tooltip names them.
+
+The page has been driven in a simulated browser (toggles, hover, zoom, keyboard, table view) but not yet looked at in a real one; if the layout looks wrong in yours, please open an issue.
+
+## 4. See what a model would be given
 
 ```
 npm run tire-lab -- sample session.ibt --out input.csv
@@ -42,7 +54,7 @@ This writes the input stream of a model run the way the overlay runs its tire pr
 
 Why both settings exist, and what is still unverified about the live set, is in the README section "Judging a model the way the overlay would run it".
 
-## 4. Use it from your own code
+## 5. Use it from your own code
 
 The package is not on npm yet, so install it from a tarball (installing from a git tag is not tested yet). It ships compiled JavaScript with type declarations: Node cannot run TypeScript from inside `node_modules`, so the sources are not importable.
 
@@ -53,12 +65,13 @@ npm install ../iracing-tire-lab/iracing-tire-lab-0.0.0.tgz   # in your project
 
 Entry points (anything else is blocked by the package `exports`):
 
-| Import                     | What                                                | Needs                                       |
-| -------------------------- | --------------------------------------------------- | ------------------------------------------- |
-| `iracing-tire-lab/ibt`     | read `.ibt` files, anonymize, session summary       | Node (`node:fs`)                            |
-| `iracing-tire-lab/model`   | model contract types and the input mask             | nothing: pure, safe in a browser or overlay |
-| `iracing-tire-lab/replay`  | IBT to model input, overlay schedule, `replayModel` | Node                                        |
-| `iracing-tire-lab/testing` | `buildIbt`, to make synthetic files in your tests   | Node                                        |
+| Import                     | What                                                      | Needs                                       |
+| -------------------------- | --------------------------------------------------------- | ------------------------------------------- |
+| `iracing-tire-lab/ibt`     | read `.ibt` files, anonymize, session summary             | Node (`node:fs`)                            |
+| `iracing-tire-lab/model`   | model contract types and the input mask                   | nothing: pure, safe in a browser or overlay |
+| `iracing-tire-lab/replay`  | IBT to model input, overlay schedule, `replayModel`       | Node                                        |
+| `iracing-tire-lab/chart`   | build the chart page: `buildChartData`, `renderChartHtml` | Node                                        |
+| `iracing-tire-lab/testing` | `buildIbt`, to make synthetic files in your tests         | Node                                        |
 
 The `tire-lab` command is installed too (`npx tire-lab inspect file.ibt`). `npm run check:package` installs the tarball into an empty project and verifies all of this.
 
@@ -69,7 +82,7 @@ Two runnable examples, which import from the source files because they live in t
 
 Run either with `node examples/<name>.ts`. They build a small synthetic file, so they need no recording. To try your own file, replace the file path they create.
 
-## 5. Share a file safely
+## 6. Share a file safely
 
 An `.ibt` contains your name, user id, iRating and the names of the other drivers in the session. Do not post it. Share the CSV and its `.meta.json` instead.
 

@@ -68,6 +68,7 @@ const usage = `
 import { IbtFile, IbtVarType } from 'iracing-tire-lab/ibt';
 import { applyMask, type TireModel } from 'iracing-tire-lab/model';
 import { frames, replayModel, PRODUCTION_HZ } from 'iracing-tire-lab/replay';
+import { buildChartData, renderChartHtml } from 'iracing-tire-lab/chart';
 import { buildIbt } from 'iracing-tire-lab/testing';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -97,12 +98,13 @@ const model: TireModel = {
 };
 const ibt = IbtFile.open(file);
 const steps = [...replayModel(model, frames(ibt), { hz: PRODUCTION_HZ, mask: 'live' })];
+const page = renderChartHtml(buildChartData(ibt, { channels: ['LFtempCM'] }));
 ibt.close();
 const masked = applyMask(
   { t: 0, dt: 0, speed: null, wheels: {} as never },
   'all'
 );
-console.log(JSON.stringify({ steps: steps.length, last: steps[steps.length - 1].output, masked: masked.speed }));
+console.log(JSON.stringify({ steps: steps.length, last: steps[steps.length - 1].output, masked: masked.speed, page: page.startsWith('<!doctype html>') && page.includes('LFtempCM') }));
 `;
 fs.writeFileSync(path.join(app, 'main.ts'), usage);
 
@@ -151,8 +153,13 @@ const out = run('node', ['out/main.js'], app).trim();
 const result = JSON.parse(out) as {
   steps: number;
   last: { carcass: { lf?: { value: number } } };
+  page: boolean;
 };
-if (result.steps !== 30 || result.last.carcass.lf?.value !== 61) {
+if (
+  result.steps !== 30 ||
+  result.last.carcass.lf?.value !== 61 ||
+  !result.page
+) {
   fail(`unexpected consumer output: ${out}`);
 }
 

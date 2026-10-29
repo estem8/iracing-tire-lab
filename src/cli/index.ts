@@ -3,10 +3,13 @@
  * iracing-tire-lab CLI.
  *   inspect   <file.ibt>                          channels, units, session summary
  *   export    <file.ibt> --channels A,B --out x.csv [--stride N]
+ *   chart     <file.ibt> --out chart.html [--channels A,B] [--max-points N]
  *   anonymize <in.ibt> <out.ibt>                  best-effort same-length redaction of personal fields
  */
 import fs from 'node:fs';
 import { formatValue, readVarValue } from '../ibt/binary.ts';
+import { buildChartData, renderChartHtml } from '../chart/index.ts';
+import { parseColumn } from '../ibt/column.ts';
 import { IbtError } from '../ibt/errors.ts';
 import { IbtFile } from '../ibt/reader.ts';
 import { anonymizeSessionYaml, summarizeSession } from '../ibt/session.ts';
@@ -23,6 +26,7 @@ const USAGE = `usage:
   tire-lab inspect <file.ibt> [--json | --session]
   tire-lab export <file.ibt> --channels A,B,C --out <file.csv> [--stride N]
   tire-lab sample <file.ibt> --out <file.csv> [--hz ${PRODUCTION_HZ}] [--arrival-hz ${APP_ARRIVAL_HZ}] [--mask live|all]
+  tire-lab chart <file.ibt> --out <chart.html> [--channels A,B,C] [--max-points 5000 | --stride N]
   tire-lab anonymize <in.ibt> <out.ibt>`;
 
 const flag = (args: string[], name: string): string | undefined => {
@@ -68,12 +72,6 @@ const inspect = (args: string[]): void => {
   } finally {
     file.close();
   }
-};
-
-/** Column names: `Name` for a scalar, `Name[i]` for one element of an array. */
-const parseColumn = (spec: string): { name: string; index: number } => {
-  const m = /^(.+)\[(\d+)\]$/.exec(spec);
-  return m ? { name: m[1], index: Number(m[2]) } : { name: spec, index: 0 };
 };
 
 const exportCsv = (args: string[]): void => {
@@ -178,6 +176,36 @@ const sample = (args: string[]): void => {
   }
 };
 
+/** One HTML file with a chart per unit and a switch per series; open it in a browser. */
+const chart = (args: string[]): void => {
+  const out = flag(args, '--out');
+  const channels = flag(args, '--channels')?.split(',').filter(Boolean);
+  const maxPoints = flag(args, '--max-points');
+  const stride = flag(args, '--stride');
+  if (
+    !out ||
+    (maxPoints !== undefined && !(Number(maxPoints) >= 2)) ||
+    (stride !== undefined &&
+      !(Number.isInteger(Number(stride)) && Number(stride) >= 1))
+  ) {
+    throw new Error(USAGE);
+  }
+  const file = IbtFile.open(args[0]);
+  try {
+    const data = buildChartData(file, {
+      channels,
+      maxPoints: maxPoints === undefined ? undefined : Number(maxPoints),
+      stride: stride === undefined ? undefined : Number(stride),
+    });
+    fs.writeFileSync(out, renderChartHtml(data));
+    console.log(
+      `wrote ${out}: ${data.series.length} series, ${data.x.length} points (every ${data.stride} of ${data.records} records)`,
+    );
+  } finally {
+    file.close();
+  }
+};
+
 const anonymize = (args: string[]): void => {
   const [input, output] = args;
   if (!input || !output) throw new Error(USAGE);
@@ -211,6 +239,7 @@ const main = (): void => {
     if (command === 'inspect' && args[0]) return inspect(args);
     if (command === 'export' && args[0]) return exportCsv(args);
     if (command === 'sample' && args[0]) return sample(args);
+    if (command === 'chart' && args[0]) return chart(args);
     if (command === 'anonymize') return anonymize(args);
     console.error(USAGE);
     process.exitCode = 2;
