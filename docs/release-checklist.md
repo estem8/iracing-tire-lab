@@ -2,7 +2,7 @@
 
 Two separate steps, each with its own checks: **opening the repository** (making it public) and **publishing to npm**. The first does not require the second.
 
-Checked boxes were verified on 2026-10-29; the rest are open. Re-check a checked item if the repository changed since, especially the personal-data scan.
+The repository was made public on 2026-10-29 with the items below still open: they now apply to a public repository. Checked boxes were verified on 2026-10-29; the rest are open. Re-check a checked item if the repository changed since, especially the personal-data scan.
 
 ## Decisions for the maintainer
 
@@ -19,7 +19,7 @@ Checked boxes were verified on 2026-10-29; the rest are open. Re-check a checked
 - [ ] **Check `anonymize` on a real file.** Open the result and confirm no names or ids remain, including other drivers in the session. The redaction list comes from irdashies' code, not from the full YAML a real file contains.
 - [ ] **Run on Windows.** The CLI and file reading have only been run on Linux.
 - [x] `SECURITY.md` added. It points to GitHub's private report and, if that is missing, to a contentless issue asking for a private channel.
-- [ ] **Enable private vulnerability reporting** (Settings, Code security) once the repository is public. It is not available while the repository is private (the API answers 404), so the first route in `SECURITY.md` does not work until then.
+- [x] Private vulnerability reporting enabled when the repository was made public on 2026-10-29 (it is not available while private).
 - [ ] Optionally add `CODE_OF_CONDUCT.md`.
 - [x] Repository topics set: `iracing`, `telemetry`, `ibt`, `overlay`, `sim-racing`, `tires`, `typescript`.
 - [ ] **README status is still honest.** "Scaffold, no model yet" stays until a model exists.
