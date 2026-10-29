@@ -11,6 +11,18 @@ import type {
   Zones,
 } from './types.ts';
 
+/** Gain per tire learned at pit stops (1 = the fitted heat). */
+export type Gains = Record<Corner, number>;
+
+export interface OverlayModelOptions {
+  /**
+   * Gains to start from, asked for when the model is made and again whenever it
+   * starts over (a new session). Return undefined for none. Ignored for a car
+   * whose profile does not calibrate. The caller owns where they are stored.
+   */
+  startingGains?: () => Gains | undefined;
+}
+
 const CORNERS: readonly Corner[] = ['lf', 'rf', 'lr', 'rr'];
 const KELVIN = 273.15;
 
@@ -57,6 +69,8 @@ export interface ShownCorner {
   /** Pressure for the label (kPa) and whether it is hot (measured or estimated). */
   pressure?: number;
   pressureHot?: boolean;
+  /** True when the hot pressure is the gas-law estimate, not a value the sim sent. */
+  pressureEstimated?: boolean;
 }
 
 /**
@@ -78,6 +92,7 @@ export interface ShownCorner {
  */
 export class OverlayModel implements TireModel {
   private readonly carPath: string | undefined;
+  private readonly options: OverlayModelOptions;
   private physics: OverlayPhysics;
   private state: Partial<Record<Corner, CornerState>> = {};
   private lastReading = '';
@@ -90,10 +105,29 @@ export class OverlayModel implements TireModel {
   /** What each corner would show on the latest sample. */
   shown: Partial<Record<Corner, ShownCorner>> = {};
 
-  constructor(carPath: string | undefined) {
+  constructor(carPath: string | undefined, options: OverlayModelOptions = {}) {
     this.carPath = carPath;
+    this.options = options;
     this.physics = new OverlayPhysics(carPath);
     this.freshOffset = this.physics.profile.freshOffset;
+    this.applyStartingGains();
+  }
+
+  /** The gains the model has learned, per tire. */
+  gains(): Gains {
+    return this.physics.thermal.gains();
+  }
+
+  /** Whether this car's gains are corrected at stops (and so worth saving). */
+  get calibrates(): boolean {
+    return this.physics.profile.calibrates !== false;
+  }
+
+  /** Asks for starting gains again, e.g. when the car and track pair changes mid-session. */
+  applyStartingGains(): void {
+    if (!this.calibrates) return;
+    const gains = this.options.startingGains?.();
+    if (gains) this.physics.thermal.setGains(gains);
   }
 
   reset(): void {
@@ -110,6 +144,7 @@ export class OverlayModel implements TireModel {
     this.pendingBits = 0;
     this.orderedBits = 0;
     this.freshOffset = this.physics.profile.freshOffset;
+    this.applyStartingGains();
     this.shown = {};
     this.events.push({ kind: 'clear' });
   }
@@ -284,7 +319,11 @@ export class OverlayModel implements TireModel {
     if (surface.active && st?.refTemp !== undefined) {
       const estimated =
         (cold * (KELVIN + surface.gas(c))) / (KELVIN + st.refTemp);
-      return { pressure: Math.round(estimated * 10) / 10, pressureHot: true };
+      return {
+        pressure: Math.round(estimated * 10) / 10,
+        pressureHot: true,
+        pressureEstimated: true,
+      };
     }
     return { pressure: Math.round(cold * 10) / 10 };
   }

@@ -159,3 +159,61 @@ test('driveSlip given by the caller heats the driven (rear) tires only', () => {
   assert.ok(spin.rr!.tread! > none.rr!.tread! + 0.5, 'rear tread is hotter');
   assert.equal(spin.lf!.tread, none.lf!.tread); // the front does not drive
 });
+
+const GAINS = { lf: 1.1, rf: 1.05, lr: 0.95, rr: 0.9 };
+
+test('startingGains: asked at construction and at a new session, ignored for a car that does not calibrate', () => {
+  let asked = 0;
+  const options = {
+    startingGains: () => {
+      asked++;
+      return GAINS;
+    },
+  };
+  const bmw = new OverlayModel('bmwm4gt3', options);
+  assert.equal(asked, 1);
+  assert.deepEqual(bmw.gains(), GAINS);
+  // Through the session change at t=80 the model starts over and asks again.
+  for (const f of stimulus('base')) {
+    if ((f.SessionTime as number) > SESSION_CHANGE_S + 1) break;
+    bmw.step(sampleOf(f));
+  }
+  assert.equal(asked, 2);
+
+  const askedFerrari = { n: 0 };
+  const ferrari = new OverlayModel('ferrari296gt3', {
+    startingGains: () => {
+      askedFerrari.n++;
+      return GAINS;
+    },
+  });
+  assert.equal(ferrari.calibrates, false);
+  assert.equal(askedFerrari.n, 0);
+  assert.deepEqual(ferrari.gains(), { lf: 1, rf: 1, lr: 1, rr: 1 });
+  ferrari.applyStartingGains();
+  assert.equal(askedFerrari.n, 0);
+});
+
+test('gains() shows what a stop taught the model', () => {
+  const model = new OverlayModel('bmwm4gt3');
+  const before = model.gains();
+  for (const f of stimulus('base')) model.step(sampleOf(f));
+  const after = model.gains();
+  assert.deepEqual(before, { lf: 1, rf: 1, lr: 1, rr: 1 });
+  assert.notDeepEqual(after, before);
+});
+
+test('pressure: measured hot is not an estimate, the gas-law value is flagged', () => {
+  const model = new OverlayModel('cadillacvseriesrgtp');
+  const frames = stimulus('base');
+  for (const f of frames.slice(0, 300)) model.step(sampleOf(f));
+  const estimated = model.shown.lf!;
+  assert.equal(estimated.pressureHot, true);
+  assert.equal(estimated.pressureEstimated, true);
+  // The sim sends a hot pressure: used as is, not flagged.
+  const withHot = { ...frames[300], LFpressure: 180 };
+  model.step(sampleOf(withHot));
+  assert.equal(model.shown.lf!.pressure, 180);
+  assert.equal(model.shown.lf!.pressureHot, true);
+  assert.equal(model.shown.lf!.pressureEstimated, undefined);
+});

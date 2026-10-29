@@ -124,6 +124,8 @@ Then in irdashies, on a local branch: `TireProcessor` keeps wear, load, alignmen
 2. **`driveSlip`.** `step(sample, { driveSlip })`; 0 when not given. Tested only against the model itself (a larger value heats the rears and not the fronts), **not** against a real processor run with wheel spin: the synthetic drive has no engine speed, so the real slip estimator gave 0 there.
 3. **Telemetry converter.** `fromTelemetryFrame(frame)` takes the overlay's frame shape (`{ Channel: { value: [x] } }`) and gives a `TireSample`. All 54 runs (3 cars x 6 variants, plus the earlier sample path) equal the real processor's output when fed through it. Absent, non-finite and non-numeric channels are null; `t` is NaN without `SessionTime`; shock travel falls back to the `SH` name like the overlay.
 
+Found while planning the adapter, added in 0.2.0: **saved gains** (`OverlayModel(car, { startingGains })`, asked for at construction and at each new session, skipped for a car that does not calibrate; `gains()` and `applyStartingGains()`), the **`pressureEstimated`** flag on the shown pressure (the overlay's local fix, so the label can say `~`), and the calibration policy and `MODEL_VERSION` exported from `iracing-tire-lab/model`. Tested on the model.
+
 One difference to keep in mind: the converter takes the number 1 as a set flag as well as `true`; the overlay takes only `true`. The SDK sends booleans, so it should not matter, but it is not the same code.
 
 Still to do for the milestone, and all of it is in irdashies: the refactor on a local branch, the copied contract test, CI on a temporary `ci/` branch, and the pull request. Nothing there has been changed or pushed.

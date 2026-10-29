@@ -19,7 +19,20 @@ export {
   carChannels,
   type ChannelGetter,
 } from './channels.ts';
-export { OverlayModel, type ShownCorner } from './overlayModel.ts';
+export {
+  OverlayModel,
+  type Gains,
+  type OverlayModelOptions,
+  type ShownCorner,
+} from './overlayModel.ts';
+export { MODEL_VERSION } from './irdashies/tireProfiles.ts';
+export {
+  calibrationKey,
+  isSavable,
+  startingGains,
+  type TireCalibration,
+  type TireCalibrationStore,
+} from './irdashies/tireCalibration.ts';
 export {
   OverlayPhysics,
   frameOf,
