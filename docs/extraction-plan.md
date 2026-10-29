@@ -103,6 +103,21 @@ Done on 2026-10-29: the five physics files are in `src/model/irdashies/`, pinned
 
 **A consequence for real files:** the overlay needs a tire's three carcass zones and three wear zones together. A recording without the wear channels gives no model output at all, as in the overlay; check `tire-lab inspect` for `*wearL/M/R` before reading a flat model line as a model fault.
 
+## 4h. Milestone 7 groundwork (checked; nothing in irdashies changed yet)
+
+- **Installing the lab from git works.** In an empty project `npm install git+file:///<lab>#main` built `dist` through `prepare` and `import 'iracing-tire-lab/model'` gave `OverlayModel`, `OverlayPhysics`, `readCar`, `frameOf`. Not checked: an install from the GitHub URL, under irdashies' own npm configuration, or on Windows. npm warned that the `prepare` script is not covered by `allowScripts`; if a stricter setting blocks it the install gets no `dist`. Fallbacks: attach the `npm pack` tarball to a GitHub release and depend on that URL, or publish (needs an explicit decision, `private: true` stays until then).
+- **Same Node.** Both repos require Node 24 and irdashies' CI already has a Windows job (`ci.yml`).
+- **Few touch points.** Outside the tire files only `processorRegistry.ts` and `iracingSdkBridge.ts` mention `TireProcessor`, so a refactor behind the class keeps the rest unchanged.
+- **The proof of "output unchanged" already exists.** `tests/golden/stimulus.ts` and `processor.json.gz` are the pre-refactor processor's output on 18 synthetic runs. The same stimulus and expected output, copied into irdashies as a test, must pass before and after the change.
+
+What the adapter needs from the lab that it lacks today (lab-only changes, to do first):
+
+1. A **refresh event** from `OverlayModel` (a reading was seeded or refreshed, and for which corners the tire was changed). The overlay's wear baseline and per-lap rate hang on that moment and stay in the overlay.
+2. A **drive-slip input** (`driveSlip`) the caller can supply, because the slip estimator stays in the overlay; today the lab uses 0.
+3. A converter from the overlay's telemetry frame to `TireSample` (lives in the overlay; the lab's `readCar` and channel table can be reused).
+
+Then in irdashies, on a local branch: `TireProcessor` keeps wear, load, alignment, slip and the snapshot, and calls `OverlayModel` for temperature, tread, disc and pressure; the five vendored files are deleted. Checks run on a temporary `ci/` branch of the fork (both operating systems) before any pull request.
+
 ## 5. Milestones
 
 Each is small and has an acceptance test.
