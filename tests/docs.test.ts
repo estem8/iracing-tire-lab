@@ -55,6 +55,9 @@ test('the examples run and print what the docs promise', () => {
   const replay = execFileSync('node', ['examples/replay-a-model.ts'], {
     encoding: 'utf8',
   });
-  assert.match(replay, /30 steps at 15 Hz/);
+  assert.match(
+    replay,
+    /30 steps at 15 Hz from 20 Hz frames, dt \(ms\): 100, 50/,
+  );
   assert.match(replay, /"kind":"estimate"/);
 });

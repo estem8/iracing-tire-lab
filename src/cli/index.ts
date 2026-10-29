@@ -10,16 +10,19 @@ import { formatValue, readVarValue } from '../ibt/binary.ts';
 import { IbtError } from '../ibt/errors.ts';
 import { IbtFile } from '../ibt/reader.ts';
 import { anonymizeSessionYaml, summarizeSession } from '../ibt/session.ts';
-import { applyMask, type InputMask } from '../model/mask.ts';
+import type { InputMask } from '../model/mask.ts';
 import type { Corner, TireSample } from '../model/types.ts';
-import { PRODUCTION_HZ } from '../replay/replay.ts';
+import {
+  APP_ARRIVAL_HZ,
+  modelInputs,
+  PRODUCTION_HZ,
+} from '../replay/replay.ts';
 import { frames } from '../replay/samples.ts';
-import { resample } from '../replay/schedule.ts';
 
 const USAGE = `usage:
   tire-lab inspect <file.ibt> [--json]
   tire-lab export <file.ibt> --channels A,B,C --out <file.csv> [--stride N]
-  tire-lab sample <file.ibt> --out <file.csv> [--hz ${PRODUCTION_HZ}] [--mask live|all]
+  tire-lab sample <file.ibt> --out <file.csv> [--hz ${PRODUCTION_HZ}] [--arrival-hz ${APP_ARRIVAL_HZ}] [--mask live|all]
   tire-lab anonymize <in.ibt> <out.ibt>`;
 
 const flag = (args: string[], name: string): string | undefined => {
@@ -145,24 +148,25 @@ const sampleCells = (s: TireSample): string[] => [
 const sample = (args: string[]): void => {
   const out = flag(args, '--out');
   const hz = Number(flag(args, '--hz') ?? PRODUCTION_HZ);
+  const arrivalHz = Number(flag(args, '--arrival-hz') ?? APP_ARRIVAL_HZ);
   const mask = (flag(args, '--mask') ?? 'live') as InputMask;
-  if (!out || !(hz > 0) || (mask !== 'live' && mask !== 'all')) {
+  if (
+    !out ||
+    !(hz > 0) ||
+    !(arrivalHz > 0) ||
+    (mask !== 'live' && mask !== 'all')
+  ) {
     throw new Error(USAGE);
   }
   const file = IbtFile.open(args[0]);
   try {
     const lines = [sampleColumns().join(',')];
-    let previous: number | undefined;
-    for (const frame of resample(frames(file), hz)) {
-      const dt = previous === undefined ? 0 : frame.sample.t - previous;
-      previous = frame.sample.t;
-      lines.push(
-        sampleCells(applyMask({ ...frame.sample, dt }, mask)).join(','),
-      );
+    for (const s of modelInputs(frames(file), { hz, arrivalHz, mask })) {
+      lines.push(sampleCells(s).join(','));
     }
     fs.writeFileSync(out, lines.join('\n') + '\n');
     console.log(
-      `wrote ${lines.length - 1} samples at ${hz} Hz (${mask}) to ${out}`,
+      `wrote ${lines.length - 1} samples (${arrivalHz} Hz arrival, ${hz} Hz tick, ${mask}) to ${out}`,
     );
   } finally {
     file.close();

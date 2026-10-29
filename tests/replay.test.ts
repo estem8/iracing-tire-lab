@@ -170,7 +170,11 @@ test('replay at the production rate is deterministic and shows the live set', ()
     assert.deepEqual(a.steps, b.steps);
     assert.equal(a.steps.length, 30);
     assert.equal(a.steps[0].dt, 0);
-    assert.ok(Math.abs(a.steps[1].dt - 1 / PRODUCTION_HZ) < 1e-9);
+    // 15 Hz picked from 20 Hz frames: the step alternates 50 and 100 ms, 2:1
+    const ms = a.steps.slice(1).map((s) => Math.round(s.dt * 1000));
+    assert.deepEqual([...new Set(ms)].sort(), [100, 50]);
+    assert.equal(ms.filter((d) => d === 50).length, 19);
+    assert.equal(ms.filter((d) => d === 100).length, 10);
     assert.ok(a.seen.every((s) => s.wheels.lf.surface === null));
     assert.deepEqual(a.seen[0].wheels.lf.carcass, [60, 61, 62]);
     const all = probe();
@@ -181,7 +185,27 @@ test('replay at the production rate is deterministic and shows the live set', ()
   }
 });
 
-test('cli sample writes the masked input stream at 15 Hz', () => {
+test('arrivalHz is an option: the recording rate gives an even 15 Hz, a finer rate more steps', () => {
+  const f = IbtFile.open(tmpIbt());
+  try {
+    const steps = (arrivalHz?: number) => [
+      ...replayModel(probe().model, frames(f), {
+        hz: PRODUCTION_HZ,
+        mask: 'live',
+        arrivalHz,
+      }),
+    ];
+    const even = steps(60);
+    assert.equal(even.length, 30);
+    assert.ok(even.slice(1).every((s) => Math.abs(s.dt - 1 / 15) < 1e-9));
+    assert.deepEqual(steps(undefined), steps(20)); // 20 Hz is the default
+    assert.throws(() => steps(0), RangeError);
+  } finally {
+    f.close();
+  }
+});
+
+test('cli sample writes the masked input stream at the overlay rates', () => {
   const input = tmpIbt();
   const out = path.join(path.dirname(input), 's.csv');
   execFileSync('node', [
@@ -199,4 +223,8 @@ test('cli sample writes the masked input stream at 15 Hz', () => {
   assert.equal(row[header.indexOf('lf.carcassL')], '60');
   assert.equal(row[header.indexOf('lf.surfaceL')], ''); // masked: empty, not 0
   assert.equal(row[header.indexOf('rf.carcassL')], ''); // not recorded: empty, not 0
+  const ms = lines
+    .slice(2)
+    .map((l) => Math.round(Number(l.split(',')[header.indexOf('dt')]) * 1000));
+  assert.deepEqual([...new Set(ms)].sort(), [100, 50]); // alternating, as in the app
 });

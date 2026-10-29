@@ -1,5 +1,6 @@
 /**
- * Replay a model the way the overlay would run it: 15 Hz, live inputs only.
+ * Replay a model the way the overlay would run it: 20 Hz frames, 15 Hz ticks,
+ * live inputs only.
  *   node examples/replay-a-model.ts
  *
  * The "model" here is a smoothing filter that shows the API. It is NOT a tire
@@ -12,7 +13,11 @@ import { IbtFile } from '../src/ibt/reader.ts';
 import { buildIbt } from '../src/ibt/testBuilder.ts';
 import { IbtVarType } from '../src/ibt/types.ts';
 import type { TireModel } from '../src/model/types.ts';
-import { PRODUCTION_HZ, replayModel } from '../src/replay/replay.ts';
+import {
+  APP_ARRIVAL_HZ,
+  PRODUCTION_HZ,
+  replayModel,
+} from '../src/replay/replay.ts';
 import { frames } from '../src/replay/samples.ts';
 
 const zone = (p: string, kind: string) =>
@@ -86,7 +91,8 @@ try {
   ];
   const last = steps[steps.length - 1];
   console.log(
-    `${steps.length} steps at ${PRODUCTION_HZ} Hz, last dt ${last.dt.toFixed(4)} s`,
+    `${steps.length} steps at ${PRODUCTION_HZ} Hz from ${APP_ARRIVAL_HZ} Hz frames, ` +
+      `dt (ms): ${[...new Set(steps.slice(1).map((s) => Math.round(s.dt * 1000)))].sort().join(', ')}`,
   );
   console.log(`last estimate: ${JSON.stringify(last.output.carcass.lf)}`);
 } finally {
