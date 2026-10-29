@@ -14,7 +14,7 @@ Checked boxes were verified on 2026-10-29; the rest are open. Re-check a checked
 
 ## Before the repository is opened
 
-- [ ] **CI is on `main` and green.** The token needs the `workflow` scope (`gh auth refresh -h github.com -s workflow`); then commit `.github/workflows/ci.yml`. It runs format check, typecheck, tests, `check:package` and the no-recordings check.
+- [x] **CI is on `main` and green** (run on commit `ea1505c`, Ubuntu, Node 24). It runs format check, typecheck, tests, `check:package` and the no-recordings check; every step passed.
 - [ ] **Run on a real recording.** `inspect`, `export`, `sample` and `anonymize` have only been run on synthetic files. Compare the channel list and units with `channels/channels.yaml`, promote what is seen to `verified`, and run `npm run docs`.
 - [ ] **Check `anonymize` on a real file.** Open the result and confirm no names or ids remain, including other drivers in the session. The redaction list comes from irdashies' code, not from the full YAML a real file contains.
 - [ ] **Run on Windows.** The CLI and file reading have only been run on Linux.
@@ -35,7 +35,8 @@ Checked boxes were verified on 2026-10-29; the rest are open. Re-check a checked
 - [ ] **Choose `engines`.** It says `node >=24`. Whether the compiled output runs on older versions is untested; find the Node version of irdashies' Electron.
 - [ ] **Add `CHANGELOG.md`** and state the rule while the version is `0.x` (the API may change).
 - [ ] **Decide what is stable.** `/ibt` and `/testing` are fairly settled. `/model` is marked PROVISIONAL; either publish only `/ibt` and `/replay`, or say plainly that `/model` will change.
-- [ ] **`npm run check:package` passes in CI**, and `npm publish --dry-run` shows only `dist/`, `LICENSE`, `NOTICE`, `README.md` and `package.json`.
+- [x] `npm run check:package` passes in CI (same run as above).
+- [ ] **`npm publish --dry-run`** shows only `dist/`, `LICENSE`, `NOTICE`, `README.md` and `package.json`. Not run: it needs `"private"` removed first. (`check:package` already verifies the same file list through `npm pack`.)
 - [ ] **Two-factor authentication** on the npm account, and a token that can only publish.
 - [x] `npm run check:package` passes locally: tarball contents, `dist/model` imports only relative paths, a consumer typechecks and runs, deep imports are blocked, the `tire-lab` command works.
 
