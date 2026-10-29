@@ -1,6 +1,6 @@
 {
   "name": "iracing-tire-lab",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Research lab for an empirically validated iRacing tire-state model: read IBT, export, replay, measure error.",
   "license": "MIT",
