@@ -14,6 +14,10 @@ export interface ChartSeries {
   /** As the file declares it; '' when it declares none. */
   unit: string;
   values: (number | null)[];
+  /** A model's output, drawn dashed; the file did not record it. */
+  dashed?: boolean;
+  /** Share the colour of the series with this name, so one tire keeps one colour. */
+  like?: string;
 }
 
 export interface ChartData {

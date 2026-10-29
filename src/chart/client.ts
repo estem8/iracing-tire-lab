@@ -93,8 +93,15 @@ export const CLIENT_SCRIPT = String.raw`
     for (var i = 0; i < panels.length; i++) if (panels[i].unit === s.unit) p = panels[i];
     if (!p) { p = { unit: s.unit, series: [] }; panels.push(p); }
     // The colour is the series' place in its chart, fixed: switching others off never repaints it.
-    var slot = p.series.length < MAX_SLOTS ? p.series.length + 1 : 0;
-    p.series.push({ name: s.name, unit: s.unit, values: s.values, on: true, slot: slot });
+    var own = 0, slot = 0, like = '', k;
+    for (k = 0; k < p.series.length; k++) if (!p.series[k].like) own++;
+    if (s.like) {
+      for (k = 0; k < p.series.length; k++) {
+        if (p.series[k].name === s.like) { slot = p.series[k].slot; like = s.like; }
+      }
+    }
+    if (!like) slot = own < MAX_SLOTS ? own + 1 : 0;
+    p.series.push({ name: s.name, unit: s.unit, values: s.values, on: true, slot: slot, like: like, dashed: !!s.dashed });
   });
 
   /* ---------- drawing ---------- */
@@ -176,6 +183,7 @@ export const CLIENT_SCRIPT = String.raw`
     ctx.lineCap = 'round';
     for (k = 0; k < vis.length; k++) {
       ctx.strokeStyle = colorOf(C, vis[k]);
+      ctx.setLineDash(vis[k].dashed ? [6, 4] : []);
       ctx.beginPath();
       var pen = false, lone = false, lx = 0, ly = 0;
       for (i = i0; i <= i1; i++) {
@@ -192,6 +200,7 @@ export const CLIENT_SCRIPT = String.raw`
       if (pen && lone) ctx.lineTo(lx + 0.01, ly);
       ctx.stroke();
     }
+    ctx.setLineDash([]);
     ctx.restore();
 
     if (state.drag && state.drag.panel === p) {

@@ -8,7 +8,11 @@
  */
 import fs from 'node:fs';
 import { formatValue, readVarValue } from '../ibt/binary.ts';
-import { buildChartData, renderChartHtml } from '../chart/index.ts';
+import {
+  addModelSeries,
+  buildChartData,
+  renderChartHtml,
+} from '../chart/index.ts';
 import { parseColumn } from '../ibt/column.ts';
 import { IbtError } from '../ibt/errors.ts';
 import { IbtFile } from '../ibt/reader.ts';
@@ -33,7 +37,7 @@ const USAGE = `usage:
   tire-lab inspect <file.ibt> [--json | --session]
   tire-lab export <file.ibt> --channels A,B,C --out <file.csv> [--stride N]
   tire-lab sample <file.ibt> --out <file.csv> [--hz ${PRODUCTION_HZ}] [--arrival-hz ${APP_ARRIVAL_HZ}] [--mask live|all]
-  tire-lab chart <file.ibt> --out <chart.html> [--channels A,B,C] [--max-points 5000 | --stride N]
+  tire-lab chart <file.ibt> --out <chart.html> [--channels A,B,C] [--max-points 5000 | --stride N] [--model [--car <car path>] [--hz ${PRODUCTION_HZ}] [--arrival-hz ${APP_ARRIVAL_HZ}] [--mask live|all]]
   tire-lab score <file.ibt> --reference <reference.json> [--car <car path>] [--max-gap 1] [--hz ${PRODUCTION_HZ}] [--arrival-hz ${APP_ARRIVAL_HZ}] [--mask live|all] [--json]
   tire-lab anonymize <in.ibt> <out.ibt>`;
 
@@ -275,11 +279,28 @@ const chart = (args: string[]): void => {
   }
   const file = IbtFile.open(args[0]);
   try {
-    const data = buildChartData(file, {
+    let data = buildChartData(file, {
       channels,
       maxPoints: maxPoints === undefined ? undefined : Number(maxPoints),
       stride: stride === undefined ? undefined : Number(stride),
     });
+    if (args.includes('--model')) {
+      const hz = Number(flag(args, '--hz') ?? PRODUCTION_HZ);
+      const arrivalHz = Number(flag(args, '--arrival-hz') ?? APP_ARRIVAL_HZ);
+      const mask = (flag(args, '--mask') ?? 'live') as InputMask;
+      if (!(hz > 0) || !(arrivalHz > 0) || (mask !== 'live' && mask !== 'all'))
+        throw new Error(USAGE);
+      const car =
+        flag(args, '--car') ?? summarizeSession(file.sessionYaml).carPath;
+      data = addModelSeries(
+        data,
+        scoreSteps(new OverlayPhysicsModel(car), frames(file), {
+          hz,
+          arrivalHz,
+          mask,
+        }),
+      );
+    }
     fs.writeFileSync(out, renderChartHtml(data));
     console.log(
       `wrote ${out}: ${data.series.length} series, ${data.x.length} points (every ${data.stride} of ${data.records} records)`,

@@ -85,6 +85,14 @@ Done on 2026-10-29: the five physics files are in `src/model/irdashies/`, pinned
 - The model has no pit-stop reset (milestone 7 territory), so scores after a tire change are worse than the overlay's would be.
 - `TireOutput` gained an optional `tread`; the tread quantity compares with the surface model's tread node, not with the (unverified) tread channels.
 
+## 4f. Milestone 6 results (run, partly)
+
+`tire-lab chart <file.ibt> --out page.html --model` draws the overlay-physics output beside the recorded channels: per tire, `model LF carcass` (dashed, the colour of that tire's `LFtempCM`) and `model LF tread` (dashed, the colour of `LFtempM`), each with its own switch, in the same chart as the temperatures because it is the same unit. A model point is the latest step at or before the chart point, within one second; elsewhere it is a gap, never 0. Needs the chart clock to be `SessionTime`.
+
+- **Checked:** the series alignment (unit tests), the CLI (a test), and in jsdom that a model series takes its tire's colour, that a model series without a recorded twin gets its own slot without moving the recorded ones, and that dashed and solid lines are both drawn. A model series is placed on a chart that already holds up to eight recorded series in the grey "other" slot beyond the eighth, as before.
+- **Not checked:** how it looks. No browser is available here, so the dashed lines, the legend and the layout have not been seen, and the legend swatch does not show the dash (the name says "model"). No real recording has been charted.
+- **The tire-viewer is not yet retired.** The plan says to retire it after this milestone and milestone 8 (the overlay's own log against the recording). The replay path is the lab's, but the viewer still shows the processor's _shown_ value, which the lab does not reproduce yet (no state machine).
+
 ## 5. Milestones
 
 Each is small and has an acceptance test.
@@ -94,7 +102,7 @@ Each is small and has an acceptance test.
 3. **Widen the input contract and the adapter.** _Done, see 4d._ Extend `TireSample` and `src/replay/samples.ts` with the channels in section 4. _Accept:_ missing channels give `null` in every test; the live mask still hides what the live SDK does not send.
 4. **Measure.** _Done, see 4e._ Add error metrics (MAE, RMSE, maximum, by wheel and zone, by phase) and a reference file for values that come from outside the `.ibt`, such as dash readings with their time. _Accept:_ one command prints the table for a recording and a reference file.
 5. **Run finding 1.** Replay a non-Ferrari GT3 recording with a pit stop; compare shown vs calibrated. _Accept:_ a written result, either a confirmed discrepancy or a closed hypothesis.
-6. **Model series on the chart.** Let `tire-lab chart` plot replay output beside the recorded channels. _Accept:_ the same plot `tire-viewer` gives, with a switch per series. After this and milestone 8, `tools/tire-viewer` can be retired.
+6. **Model series on the chart.** _Done, see 4f._ Let `tire-lab chart` plot replay output beside the recorded channels. _Accept:_ the same plot `tire-viewer` gives, with a switch per series. After this and milestone 8, `tools/tire-viewer` can be retired.
 7. **Return to the overlay.** Export the model through `iracing-tire-lab/model`; in irdashies make `TireProcessor` a thin adapter (channels in, snapshot out), delete the copies, add a contract test on a fixed synthetic sequence. _Accept:_ the widget's output is unchanged for that sequence; CI is green, including on Windows through a temporary `ci/` branch.
 8. **Close the loop in a real session.** With a flag, the overlay logs its output with `SessionTime`; the lab reads that log and the `.ibt` of the same session and prints the milestone-4 table. _Accept:_ the numbers the overlay showed can be compared with the recording.
 

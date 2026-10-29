@@ -234,3 +234,29 @@ test('tire-lab score prints the table and --json; a bad reference fails with its
   assert.throws(() => run('--reference', refPath), /readings\[0\]/);
   fs.rmSync(dir, { recursive: true });
 });
+
+test('tire-lab chart --model adds dashed model series to the page', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chart-model-'));
+  const ibt = path.join(dir, 'a.ibt');
+  fs.writeFileSync(ibt, buildIbt({ yaml: YAML, vars, rows }));
+  const html = path.join(dir, 'c.html');
+  const said = execFileSync(
+    'node',
+    [
+      'src/cli/index.ts',
+      'chart',
+      ibt,
+      '--out',
+      html,
+      '--channels',
+      'LFtempCM',
+      '--model',
+    ],
+    { encoding: 'utf8' },
+  );
+  const page = fs.readFileSync(html, 'utf8');
+  assert.match(page, /model LF carcass/);
+  assert.match(page, /model RR tread/);
+  assert.match(said, /series/);
+  fs.rmSync(dir, { recursive: true });
+});

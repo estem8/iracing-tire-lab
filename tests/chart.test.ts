@@ -185,3 +185,38 @@ test('cli chart writes one page; a missing channel and a missing --out fail clea
   assert.match(run('--out', out, '--channels', 'Nope'), /missing-channels/);
   assert.match(run(), /usage:/);
 });
+
+test('addModelSeries places steps on the chart clock, shares tire colours, leaves gaps as null', async () => {
+  const { addModelSeries } = await import('../src/chart/model.ts');
+  const data = {
+    title: 't',
+    tickRate: 60,
+    records: 5,
+    stride: 1,
+    xName: 'SessionTime',
+    x: [0, 0.5, 1, 1.5, 4],
+    series: [{ name: 'LFtempCM', unit: 'C', values: [1, 2, 3, 4, 5] }],
+  };
+  const out = (carcass: number) => ({
+    carcass: { lf: { kind: 'estimate' as const, model: 'm', value: carcass } },
+  });
+  const steps = [
+    { t: 0.4, phase: 'track' as const, output: out(50) },
+    { t: 1.2, phase: 'track' as const, output: out(60) },
+  ];
+  const next = addModelSeries(data, steps);
+  assert.equal(next.series.length, 2);
+  assert.equal(data.series.length, 1); // input untouched
+  const model = next.series[1];
+  assert.equal(model.name, 'model LF carcass');
+  assert.equal(model.dashed, true);
+  assert.equal(model.like, 'LFtempCM');
+  assert.equal(model.unit, 'C');
+  // before the first step: null; then the latest step at or before each point;
+  // at t=4 the last step (1.2) is 2.8 s old, over the 1 s gap: null again.
+  assert.deepEqual(model.values, [null, 50, 50, 60, null]);
+  assert.throws(
+    () => addModelSeries({ ...data, xName: 'record / tick rate' }, steps),
+    /not SessionTime/,
+  );
+});

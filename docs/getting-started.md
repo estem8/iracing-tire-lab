@@ -42,6 +42,8 @@ Open `chart.html` in any browser. It is one file with no outside requests. There
 
 Without `--channels` it plots the tire channels the file has: the middle carcass and middle surface temperature of each tire, speed, throttle and brake. Name your own with `--channels LFtempCL,LFtempCM,Speed,Shock[2]`. Files are thinned to 5000 points per series (`--max-points`, or `--stride N`; `--stride 1` plots every record), so a spike narrower than the step can fall between points. A value the file cannot give is a gap in the line, never a zero. Series in the same chart past the eighth share one grey, and the tooltip names them.
 
+Add `--model` to draw the overlay's physics beside the recording: per tire a dashed `model … carcass` line in the colour of that tire's carcass channel and a dashed `model … tread` line in the colour of its surface channel, each with its own switch (`--car`, `--hz`, `--arrival-hz` and `--mask` work as in `sample`). The model is seeded from the first carcass reading and has no pit-stop reset, so it drifts from a tire that was changed; see `docs/extraction-plan.md`.
+
 The page has been driven in a simulated browser (toggles, hover, zoom, keyboard, table view) but not yet looked at in a real one; if the layout looks wrong in yours, please open an issue.
 
 ## 4. See what a model would be given
@@ -65,13 +67,13 @@ npm install ../iracing-tire-lab/iracing-tire-lab-0.0.0.tgz   # in your project
 
 Entry points (anything else is blocked by the package `exports`):
 
-| Import                     | What                                                      | Needs                                       |
-| -------------------------- | --------------------------------------------------------- | ------------------------------------------- |
-| `iracing-tire-lab/ibt`     | read `.ibt` files, anonymize, session summary             | Node (`node:fs`)                            |
-| `iracing-tire-lab/model`   | model contract types and the input mask                   | nothing: pure, safe in a browser or overlay |
-| `iracing-tire-lab/replay`  | IBT to model input, overlay schedule, `replayModel`       | Node                                        |
-| `iracing-tire-lab/chart`   | build the chart page: `buildChartData`, `renderChartHtml` | Node                                        |
-| `iracing-tire-lab/testing` | `buildIbt`, to make synthetic files in your tests         | Node                                        |
+| Import                     | What                                                                        | Needs                                       |
+| -------------------------- | --------------------------------------------------------------------------- | ------------------------------------------- |
+| `iracing-tire-lab/ibt`     | read `.ibt` files, anonymize, session summary                               | Node (`node:fs`)                            |
+| `iracing-tire-lab/model`   | model contract types and the input mask                                     | nothing: pure, safe in a browser or overlay |
+| `iracing-tire-lab/replay`  | IBT to model input, overlay schedule, `replayModel`                         | Node                                        |
+| `iracing-tire-lab/chart`   | build the chart page: `buildChartData`, `addModelSeries`, `renderChartHtml` | Node                                        |
+| `iracing-tire-lab/testing` | `buildIbt`, to make synthetic files in your tests                           | Node                                        |
 
 The `tire-lab` command is installed too (`npx tire-lab inspect file.ibt`). `npm run check:package` installs the tarball into an empty project and verifies all of this.
 

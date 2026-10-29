@@ -7,3 +7,4 @@ export {
   type ChartSeries,
 } from './data.ts';
 export { renderChartHtml } from './html.ts';
+export { addModelSeries, type ModelSeriesOptions } from './model.ts';
