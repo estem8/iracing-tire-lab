@@ -6,3 +6,4 @@ datasets/raw/
 datasets/private/
 *.log
 dist/
+dist-exe/

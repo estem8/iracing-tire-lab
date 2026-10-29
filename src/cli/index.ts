@@ -7,6 +7,8 @@
  *   anonymize <in.ibt> <out.ibt>                  best-effort same-length redaction of personal fields
  */
 import fs from 'node:fs';
+import path from 'node:path';
+import { isSea } from 'node:sea';
 import { formatValue, readVarValue } from '../ibt/binary.ts';
 import {
   addModelSeries,
@@ -25,6 +27,9 @@ import {
 } from '../metrics/index.ts';
 import type { InputMask } from '../model/mask.ts';
 import { OverlayModel } from '../model/overlayModel.ts';
+import { startServer } from '../app/server.ts';
+import { defaultSystem, type TelemetryCommand } from '../app/system.ts';
+import { renderFilePage } from '../app/viewFile.ts';
 import type { CarSample, Corner, TireSample } from '../model/types.ts';
 import {
   APP_ARRIVAL_HZ,
@@ -39,7 +44,10 @@ const USAGE = `usage:
   tire-lab sample <file.ibt> --out <file.csv> [--hz ${PRODUCTION_HZ}] [--arrival-hz ${APP_ARRIVAL_HZ}] [--mask live|all]
   tire-lab chart <file.ibt> --out <chart.html> [--channels A,B,C] [--max-points 5000 | --stride N] [--model [--car <car path>] [--hz ${PRODUCTION_HZ}] [--arrival-hz ${APP_ARRIVAL_HZ}] [--mask live|all]]
   tire-lab score <file.ibt> --reference <reference.json> [--car <car path>] [--max-gap 1] [--hz ${PRODUCTION_HZ}] [--arrival-hz ${APP_ARRIVAL_HZ}] [--mask live|all] [--json]
-  tire-lab anonymize <in.ibt> <out.ibt>`;
+  tire-lab anonymize <in.ibt> <out.ibt>
+  tire-lab view <file.ibt> [--out page.html] [--no-open]   chart with the model, opened in the browser
+  tire-lab app [--no-open] [--port N] [--self-test]        local page: open files, switch iRacing's recording
+  tire-lab telemetry <on|off>                              tell iRacing to start or stop recording (Windows)`;
 
 const flag = (args: string[], name: string): string | undefined => {
   const i = args.indexOf(name);
@@ -337,14 +345,100 @@ const anonymize = (args: string[]): void => {
   );
 };
 
-const main = (): void => {
-  const [command, ...args] = process.argv.slice(2);
+/** A recording's chart with the model, written next to it and opened in the browser. */
+const view = async (args: string[]): Promise<void> => {
+  const file = args[0];
+  const out =
+    flag(args, '--out') ??
+    path.join(
+      path.dirname(file),
+      `${path.basename(file).replace(/\.ibt$/i, '')}.tire-lab.html`,
+    );
+  const page = renderFilePage(file);
+  fs.writeFileSync(out, page.html);
+  console.log(
+    `wrote ${out} (${page.records} records${page.car ? `, ${page.car}` : ''})`,
+  );
+  if (page.note) console.log(page.note);
+  if (!args.includes('--no-open')) {
+    try {
+      await defaultSystem().openBrowser(out);
+    } catch (e) {
+      console.log(`Open the file yourself: ${(e as Error).message}`);
+    }
+  }
+};
+
+/** The local page: open files, switch iRacing's telemetry recording. Runs until quit. */
+const appCommand = async (args: string[]): Promise<void> => {
+  const system = defaultSystem();
+  const port = Number(flag(args, '--port') ?? 0);
+  if (!Number.isInteger(port) || port < 0 || port > 65535)
+    throw new Error(USAGE);
+  let quit: () => void = () => undefined;
+  const quitted = new Promise<void>((resolve) => (quit = resolve));
+  const server = await startServer(system, { port, onQuit: () => quit() });
+  if (args.includes('--self-test')) {
+    // One request through the real server and system, for the build's own check.
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/status`, {
+      headers: { 'x-token': server.token },
+    });
+    console.log(JSON.stringify({ status: res.status, ...(await res.json()) }));
+    await server.close();
+    return;
+  }
+  console.log(`Tire Lab is running at ${server.url}`);
+  console.log('Close this window or press Ctrl+C to quit.');
+  if (!args.includes('--no-open')) {
+    try {
+      await system.openBrowser(server.url);
+    } catch {
+      console.log('Open that address in a browser.');
+    }
+  }
+  await quitted;
+  await server.close();
+};
+
+/** Tells iRacing to start or stop writing its telemetry file. */
+const telemetryCommand = async (args: string[]): Promise<void> => {
+  const word = args[0];
+  const command: TelemetryCommand | undefined =
+    word === 'on' ? 'start' : word === 'off' ? 'stop' : undefined;
+  if (!command) throw new Error(USAGE);
+  await defaultSystem().telemetry(command);
+  console.log(
+    `sent: ${command}. iRacing records only while you are in the car; this cannot confirm it.`,
+  );
+};
+
+const pause = (): Promise<void> =>
+  process.stdin.isTTY
+    ? new Promise((resolve) => {
+        console.error('Press Enter to close.');
+        process.stdin.once('data', () => resolve());
+      })
+    : Promise.resolve();
+
+const main = async (): Promise<void> => {
+  // A packaged executable also gets its own path as the first argument.
+  const argv = process.argv.slice(2).filter((a) => a !== process.execPath);
+  const [command, ...args] = argv;
+  const packaged = isSea();
   try {
+    // Double-clicked (no arguments) or started with only options: the app.
+    if (packaged && (command === undefined || command.startsWith('--')))
+      return await appCommand(argv);
+    if (command && /\.ibt$/i.test(command) && fs.existsSync(command))
+      return await view(argv);
     if (command === 'inspect' && args[0]) return inspect(args);
     if (command === 'export' && args[0]) return exportCsv(args);
     if (command === 'sample' && args[0]) return sample(args);
     if (command === 'chart' && args[0]) return chart(args);
     if (command === 'score' && args[0]) return scoreCommand(args);
+    if (command === 'view' && args[0]) return await view(args);
+    if (command === 'app') return await appCommand(args);
+    if (command === 'telemetry') return await telemetryCommand(args);
     if (command === 'anonymize') return anonymize(args);
     console.error(USAGE);
     process.exitCode = 2;
@@ -354,6 +448,8 @@ const main = (): void => {
     );
     process.exitCode = 1;
   }
+  // Double-clicked or dropped on: the window would vanish with the message.
+  if (packaged && process.exitCode) await pause();
 };
 
-main();
+void main();
