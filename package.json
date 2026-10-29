@@ -13,11 +13,13 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "docs": "node scripts/channelsDoc.ts",
     "tire-lab": "node src/cli/index.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "prettier": "^3.3.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "yaml": "^2.9.1"
   }
 }

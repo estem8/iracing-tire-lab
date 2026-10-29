@@ -12,7 +12,7 @@ Follow [docs/recording-protocol.md](docs/recording-protocol.md). Never commit an
 
 ## 3. Clarify a channel
 
-Edit `channels/channels.yaml`. Evidence is the output of `inspect --json` for that channel from a real file, with the car and session type. Use what the file says; do not guess units. Mark anything you could not see as `unverified`.
+Edit `channels/channels.yaml`. Evidence is the output of `inspect --json` for that channel from a real file, with the car and session type. Use what the file says; do not guess units. Mark anything you could not see as `unverified`. Then run `npm run docs` and commit the regenerated `docs/channels.md`; a test fails if it is out of date.
 
 ## 4. Change code
 
