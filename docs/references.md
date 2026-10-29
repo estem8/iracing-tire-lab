@@ -47,11 +47,11 @@ A recording cannot say how hot a tire really was: the carcass channels (`*tempC*
 npm run tire-lab -- score recording.ibt --reference reference.json
 ```
 
-It runs the overlay's physics (`OverlayPhysicsModel`) over the recording the way the overlay does (20 Hz arrival, 15 Hz tick, the `live` mask) and prints, for all readings and grouped by corner, quantity, phase (`track`, `pit`, `garage`) and kind: the count, mean absolute error, RMS error, largest absolute error and bias. Errors are **model minus reference**, so a positive bias means the model reads high. `--json` also lists every pair. A reading is matched to the latest model step at or before it, if that step is within `--max-gap` seconds (default 1); readings with nothing to compare to are counted, not hidden.
+It runs the overlay's tire estimate (`OverlayModel`, physics plus its pit-stop state machine, without wear, load and the slip estimator) over the recording the way the overlay does (20 Hz arrival, 15 Hz tick, the `live` mask) and prints, for all readings and grouped by corner, quantity, phase (`track`, `pit`, `garage`) and kind: the count, mean absolute error, RMS error, largest absolute error and bias. Errors are **model minus reference**, so a positive bias means the model reads high. `--json` also lists every pair. A reading is matched to the latest model step at or before it, if that step is within `--max-gap` seconds (default 1); readings with nothing to compare to are counted, not hidden.
 
 ## What the table does and does not say
 
-- The model here is the overlay's physics layer without its state machine, so after a tire change it keeps heating the old tires (see `docs/extraction-plan.md`). Score stints without a change, or expect a larger error afterwards; the phase and kind columns help to see that.
+- The model resets tires at a pit stop the way the overlay does (checked against the real processor on synthetic drives, `docs/extraction-plan.md` 4g). It does not have the slip estimator, so wheel-spin heat is missing, and it needs the `*wear` channels in the recording as well as the carcass ones.
 - The model's carcass value is the one the overlay builds its shown number on, before the per-zone spread; compare it with a dash value, not with a single zone of a pit reading, unless the spread is the question.
 - A few readings say little. The count is printed so it can be judged; there is no confidence interval.
 - The table measures distance to the reference values you supply, not to the sim's internal state.

@@ -1,10 +1,10 @@
 /**
- * Makes tests/golden/processor.json: the real irdashies TireProcessor run over
+ * Makes tests/golden/processor.json.gz (gzipped JSON): the real irdashies TireProcessor run over
  * tests/golden/stimulus.ts. It needs an irdashies checkout and esbuild, neither
  * of which is a dependency of this repo:
  *
  *   node scripts/goldenProcessor.cjs --source <irdashies checkout> \
- *        --esbuild <path to the esbuild package> --out tests/golden/processor.json
+ *        --esbuild <path to the esbuild package> --out tests/golden/processor.json.gz
  *
  * Check the checkout is at the commit in src/model/irdashies/PROVENANCE.json
  * first; the script prints the commit it ran against.
@@ -20,7 +20,7 @@ const flag = (name) => {
 };
 const source = flag('--source');
 const esbuildPath = flag('--esbuild');
-const out = flag('--out') ?? 'tests/golden/processor.json';
+const out = flag('--out') ?? 'tests/golden/processor.json.gz';
 if (!source || !esbuildPath) {
   console.error(
     'usage: goldenProcessor.cjs --source <checkout> --esbuild <package path> [--out file]',
@@ -48,26 +48,28 @@ fs.writeFileSync(
   entry,
   `
 import { TireProcessor } from ${JSON.stringify(path.resolve(source, 'src/app/processors/TireProcessor'))};
-import { stimulus, CARS } from ${JSON.stringify(stimulus)};
+import { stimulus, CARS, VARIANTS } from ${JSON.stringify(stimulus)};
 const out: Record<string, unknown> = {};
-for (const car of CARS) {
+for (const car of CARS) for (const variant of VARIANTS) {
   const p = new TireProcessor();
   p.init({ DriverInfo: { DriverCarIdx: 0, Drivers: [{ CarIdx: 0, CarPath: car }] }, WeekendInfo: { TrackName: 'synthetic', SubSessionID: 1 } } as never);
-  // Columns, not rows, to keep the file small: the rounded tread temperature
-  // (tempReal) and the brake-disc level of each corner, one entry per frame.
+  // Columns, not rows, to keep the file small: per corner the rounded tread
+  // temperature (tempReal), the middle zone of the shown temperature, the
+  // brake-disc level and the shown pressure, one entry per frame.
   const cols: Record<string, (number | null)[]> = {};
-  for (const f of stimulus()) {
+  for (const f of stimulus(variant)) {
     const frame: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(f)) frame[k] = { value: [v] };
     p.onFrame(frame as never);
-    const corners = p.snapshot().corners as Record<string, { tempReal?: number[]; disc?: number }>;
+    const corners = p.snapshot().corners as Record<string, { temp: number[]; tempReal?: number[]; disc?: number; pressure?: number }>;
     for (const c of ['lf', 'rf', 'lr', 'rr']) {
       (cols[c + '.tread'] ??= []).push(corners[c]?.tempReal?.[0] ?? null);
+      (cols[c + '.temp'] ??= []).push(corners[c]?.temp[1] ?? null);
       (cols[c + '.disc'] ??= []).push(corners[c]?.disc ?? null);
+      (cols[c + '.pressure'] ??= []).push(corners[c]?.pressure ?? null);
     }
   }
-  const rows = cols;
-  out[car] = rows;
+  out[car + '/' + variant] = cols;
 }
 process.stdout.write(JSON.stringify(out));
 `,
@@ -106,7 +108,10 @@ build({
 }).then(() => {
   fs.writeFileSync(
     out,
-    execFileSync('node', [bundle], { encoding: 'utf8', maxBuffer: 1 << 28 }),
+    require('node:zlib').gzipSync(
+      execFileSync('node', [bundle], { encoding: 'utf8', maxBuffer: 1 << 28 }),
+      { level: 9 },
+    ),
   );
   fs.rmSync(dir, { recursive: true });
   console.log(`wrote ${out} from irdashies ${commit}`);

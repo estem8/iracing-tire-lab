@@ -94,6 +94,8 @@ export interface TireOutput {
   carcass: Partial<Record<Corner, Estimate<number>>>;
   /** Tread surface temperature, where the model has one. */
   tread?: Partial<Record<Corner, Estimate<number>>>;
+  /** What an overlay would display per tire (left, middle, right zone), where a model has such a thing. */
+  shown?: Partial<Record<Corner, Estimate<Zones>>>;
 }
 
 export interface TireModel {

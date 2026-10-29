@@ -17,7 +17,7 @@ export {
   carChannels,
   type ChannelGetter,
 } from './channels.ts';
-export { OverlayPhysicsModel } from './overlayModel.ts';
+export { OverlayModel, type ShownCorner } from './overlayModel.ts';
 export {
   OverlayPhysics,
   frameOf,

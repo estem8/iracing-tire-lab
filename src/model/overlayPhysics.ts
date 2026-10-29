@@ -7,7 +7,7 @@ import { carChannels } from './channels.ts';
 import type { Corner, TireSample } from './types.ts';
 
 /** Copied from TireProcessor.ts, which is not vendored (it is the glue, see docs/extraction-plan.md). */
-const DEFAULT_AMBIENT = 25;
+export const DEFAULT_AMBIENT = 25;
 const TRACK_SHARE = 0.3;
 
 /** One frame by SDK channel name; a channel that is absent is absent, never 0. */

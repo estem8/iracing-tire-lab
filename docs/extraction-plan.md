@@ -13,7 +13,7 @@ overlay logs its own output     lab measures the error against the references
    model version
 ```
 
-Today the widget estimates tire state in the overlay, and the lab can read, chart and replay recordings, but **the lab has no tire model**. `tools/tire-viewer` in irdashies is the only thing that runs the real model on an `.ibt`. This plan moves the model into the lab so it can be measured and fixed there, then returns it to the overlay.
+Today the widget estimates tire state in the overlay, and the lab can read, chart and replay recordings, but **the lab had no tire model** (it has one now, see 4c to 4g). `tools/tire-viewer` in irdashies is the only thing that runs the real model on an `.ibt`. This plan moves the model into the lab so it can be measured and fixed there, then returns it to the overlay.
 
 Status words below: **read** means seen in the code, **unverified** means not run or not checked against a real recording. Everything here was read in the `feat/tire-widget` branch of irdashies at `d421f67`; no real `.ibt` was available.
 
@@ -79,7 +79,7 @@ Done on 2026-10-29: the five physics files are in `src/model/irdashies/`, pinned
 
 ## 4e. Milestone 4 results (run)
 
-`tire-lab score <file.ibt> --reference <file.json>` prints MAE, RMSE, largest error and bias, overall and by corner, quantity, phase and kind (format and caveats in `docs/references.md`). The model is `OverlayPhysicsModel` (the physics layer as a `TireModel`, seeded from the first carcass reading like the overlay's session start). Tested on stats with known values, strict reference parsing, matching and unmatched counting, grouping, and end to end through the CLI on a synthetic recording. `./metrics` is a new package entry point.
+`tire-lab score <file.ibt> --reference <file.json>` prints MAE, RMSE, largest error and bias, overall and by corner, quantity, phase and kind (format and caveats in `docs/references.md`). The model is `OverlayModel` (since 4g the whole overlay estimate; at the time of this milestone only the physics layer, seeded from the first carcass reading). Tested on stats with known values, strict reference parsing, matching and unmatched counting, grouping, and end to end through the CLI on a synthetic recording. `./metrics` is a new package entry point.
 
 - **Not measured on real data.** No real recording or dash reading has been through it; the only runs are synthetic. The numbers it prints are only as good as the reference file.
 - The model has no pit-stop reset (milestone 7 territory), so scores after a tire change are worse than the overlay's would be.
@@ -91,7 +91,17 @@ Done on 2026-10-29: the five physics files are in `src/model/irdashies/`, pinned
 
 - **Checked:** the series alignment (unit tests), the CLI (a test), and in jsdom that a model series takes its tire's colour, that a model series without a recorded twin gets its own slot without moving the recorded ones, and that dashed and solid lines are both drawn. A model series is placed on a chart that already holds up to eight recorded series in the grey "other" slot beyond the eighth, as before.
 - **Not checked:** how it looks. No browser is available here, so the dashed lines, the legend and the layout have not been seen, and the legend swatch does not show the dash (the name says "model"). No real recording has been charted.
-- **The tire-viewer is not yet retired.** The plan says to retire it after this milestone and milestone 8 (the overlay's own log against the recording). The replay path is the lab's, but the viewer still shows the processor's _shown_ value, which the lab does not reproduce yet (no state machine).
+- **The tire-viewer is not yet retired.** The plan says to retire it after this milestone and milestone 8 (the overlay's own log against the recording). The replay path is the lab's, but the viewer still shows the processor's _shown_ value, which the lab now reproduces (4g) on synthetic drives; on a real recording that is still unchecked.
+
+## 4g. State machine ported (run)
+
+`OverlayModel` (`src/model/overlayModel.ts`) is the overlay's physics plus its reconciliation layer, ported from `TireProcessor` at the pinned commit: the session clear, seeding from the first reading (stale hot start, even fresh start), refresh detection, the per-stop gain, the fresh-tire offset learned from even readings, tire changes from `PitSvFlags` (remembered order, flags at the reading, flags late in the service) and from the pit-menu boxes, the shown temperature with its warm-up-scaled zone spread, the tread, the disc and the pressure label.
+
+**Checked against the real processor, not by reading:** 18 runs (3 cars x 6 variants of a synthetic drive, `tests/golden/stimulus.ts`) equal the processor's tread, middle-zone shown temperature (whole degrees), disc level and pressure at every one of about 3,000 frames. The variants differ so that each branch matters: breaking the follow-service step, the remembered order, the pit-menu boxes, the pit-road gate on the order, the warm-up scaling, the fresh-offset learning or the calibration each makes some runs fail (done by hand, one at a time). The golden file is gzipped JSON (about 130 KB).
+
+**Not ported, and not covered:** wear and wear per lap, load from shock travel, camber and toe, the slip estimator (so `driveSlip` is 0 and wheel-spin heat is missing: a real recording with wheel spin will differ from the overlay there), and saved calibrations on disk (the lab starts each run with unlearned gains, the overlay may start with saved ones). The left and right zones of the shown temperature are computed but only the middle zone is compared.
+
+**A consequence for real files:** the overlay needs a tire's three carcass zones and three wear zones together. A recording without the wear channels gives no model output at all, as in the overlay; check `tire-lab inspect` for `*wearL/M/R` before reading a flat model line as a model fault.
 
 ## 5. Milestones
 
@@ -112,7 +122,7 @@ Each is small and has an acceptance test.
 | ------------------------------------------------------------ | ---------------------------------------------------------------- |
 | a wrong channel, unit or meaning (for example `dcBrakeBias`) | the overlay adapter, and the registry in the lab                 |
 | model constants or structure                                 | the lab; new `MODEL_VERSION`; the overlay bumps the dependency   |
-| the stint and pit-stop state machine                         | wherever it lives after milestone 7                              |
+| the stint and pit-stop state machine                         | the lab (`OverlayModel`); the overlay takes it at milestone 7    |
 | a label or colour on screen (like the pressure `~`)          | the overlay only                                                 |
 | step size or frame rate                                      | both: the replay settings in the lab and the code in the overlay |
 
@@ -130,7 +140,7 @@ How to check it with data, not opinion: record the start of each kind (garage to
 
 ## 7. Open decisions
 
-- Does the reconciliation state machine (section 2) move into the lab, or stay in the overlay behind the model? Moving it is the only way to reproduce what the driver sees; leaving it makes the lab's numbers differ from the widget's.
+- ~~Does the reconciliation state machine (section 2) move into the lab?~~ Decided: yes, ported (4g). What is left of it in the overlay: wear, load, alignment and the slip estimator.
 - Is the slip estimator (`TireSlipEstimator`) in scope? It does not affect temperature.
 - Should the overlay depend on a git tag of the lab or on a published package? Installing from a git tag is untested.
 - Where do reference values from outside the file (dash readings) live, given recordings cannot be committed?

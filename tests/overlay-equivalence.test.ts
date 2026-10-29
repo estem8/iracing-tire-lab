@@ -1,14 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 import { OverlayPhysics } from '../src/model/overlayPhysics.ts';
 import type { Corner } from '../src/model/types.ts';
-import { CARS, PIT_IN_S, stimulus } from './golden/stimulus.ts';
+import { OverlayModel } from '../src/model/overlayModel.ts';
+import { sampleOf } from './golden/sample.ts';
+import { CARS, PIT_IN_S, stimulus, VARIANTS } from './golden/stimulus.ts';
 
-/** Per car, per corner: the overlay's rounded tread temperature and disc level, one entry per frame. */
+/** Per car and variant, per corner: the overlay's rounded tread temperature and disc level, one entry per frame. */
 type Golden = Record<string, Record<string, (number | null)[]>>;
 const golden = JSON.parse(
-  fs.readFileSync('tests/golden/processor.json', 'utf8'),
+  zlib.gunzipSync(fs.readFileSync('tests/golden/processor.json.gz')).toString(),
 ) as Golden;
 
 const CORNERS: Corner[] = ['lf', 'rf', 'lr', 'rr'];
@@ -28,7 +31,7 @@ const PREFIX: Record<Corner, string> = {
 for (const car of CARS) {
   test(`${car}: lab physics equals the overlay's tread and disc before the stop`, () => {
     const frames = stimulus();
-    const rows = golden[car];
+    const rows = golden[`${car}/base`];
     assert.equal(rows['lf.tread'].length, frames.length);
     const physics = new OverlayPhysics(car);
     let compared = 0;
@@ -109,7 +112,9 @@ test('without the state machine the lab diverges at a tire change', () => {
     for (const c of CORNERS)
       worst = Math.max(
         worst,
-        Math.abs(physics.tread(c) - golden.ferrari296gt3[`${c}.tread`][i]!),
+        Math.abs(
+          physics.tread(c) - golden['ferrari296gt3/base'][`${c}.tread`][i]!,
+        ),
       );
   });
   assert.ok(
@@ -139,3 +144,51 @@ test('a car sample round-trips to the channels the physics reads, nulls left out
   assert.equal('Throttle' in frame, false); // absent, not 0
   assert.equal(frameOf({ ...sample, speed: null }).Speed, undefined);
 });
+
+/**
+ * The whole overlay estimate, state machine included, against the real
+ * processor over the entire run: tread temperature, the middle zone of the shown
+ * temperature (whole degrees, as the processor rounds), brake-disc level and the
+ * pressure for the label. Six variants reach different branches: a change
+ * ordered early, late or by the pit menu, a stop without a change, a stale hot
+ * start and an even (fresh) start.
+ */
+for (const car of CARS) {
+  for (const variant of VARIANTS) {
+    test(`${car} / ${variant}: the ported state machine equals the overlay for the whole run`, () => {
+      const cols = golden[`${car}/${variant}`];
+      const frames = stimulus(variant);
+      assert.equal(cols['lf.tread'].length, frames.length);
+      const model = new OverlayModel(car);
+      let compared = 0;
+      frames.forEach((frame, i) => {
+        model.step(sampleOf(frame));
+        for (const c of CORNERS) {
+          const got = model.shown[c];
+          const at = `${car}/${variant} ${c} t=${frame.SessionTime}`;
+          const check = (
+            name: string,
+            mine: number | undefined,
+            want: number | null,
+          ) => {
+            assert.equal(mine ?? null, want, `${name} ${at}`);
+            if (want !== null) compared++;
+          };
+          check(
+            'tread',
+            got?.tread === undefined ? undefined : Math.round(got.tread),
+            cols[`${c}.tread`][i],
+          );
+          check(
+            'temp',
+            got ? Math.round(got.temp[1]) : undefined,
+            cols[`${c}.temp`][i],
+          );
+          check('disc', got?.disc, cols[`${c}.disc`][i]);
+          check('pressure', got?.pressure, cols[`${c}.pressure`][i]);
+        }
+      });
+      assert.ok(compared > 3000, `compared ${compared} values`);
+    });
+  }
+}

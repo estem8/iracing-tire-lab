@@ -12,7 +12,7 @@ import {
   scoreSteps,
   type ScoreStep,
 } from '../src/metrics/index.ts';
-import { OverlayPhysicsModel } from '../src/model/overlayModel.ts';
+import { OverlayModel } from '../src/model/overlayModel.ts';
 import { IbtFile } from '../src/ibt/reader.ts';
 import { IbtVarType } from '../src/ibt/types.ts';
 import { buildIbt } from '../src/ibt/testBuilder.ts';
@@ -161,10 +161,10 @@ const vars = [
   { name: 'IsOnTrack', type: IbtVarType.Bool },
   { name: 'AirTemp', type: IbtVarType.Float },
   ...CORNERS.flatMap((c) =>
-    ['L', 'M', 'R'].map((z) => ({
-      name: `${P[c]}tempC${z}`,
-      type: IbtVarType.Float,
-    })),
+    ['L', 'M', 'R'].flatMap((z) => [
+      { name: `${P[c]}tempC${z}`, type: IbtVarType.Float },
+      { name: `${P[c]}wear${z}`, type: IbtVarType.Float },
+    ]),
   ),
 ];
 const rows = Array.from({ length: 1800 }, (_, i) => ({
@@ -176,7 +176,10 @@ const rows = Array.from({ length: 1800 }, (_, i) => ({
   AirTemp: 20,
   ...Object.fromEntries(
     CORNERS.flatMap((c) =>
-      ['L', 'M', 'R'].map((z) => [`${P[c]}tempC${z}`, 40]),
+      ['L', 'M', 'R'].flatMap((z) => [
+        [`${P[c]}tempC${z}`, 40],
+        [`${P[c]}wear${z}`, 0.97],
+      ]),
     ),
   ),
 }));
@@ -185,14 +188,10 @@ test('the overlay-physics model seeds from the first reading and gives carcass a
   const file = path.join(os.tmpdir(), `score-${process.pid}.ibt`);
   fs.writeFileSync(file, buildIbt({ yaml: YAML, vars, rows }));
   const ibt = IbtFile.open(file);
-  const result = scoreSteps(
-    new OverlayPhysicsModel('ferrari296gt3'),
-    frames(ibt),
-    {
-      hz: 15,
-      mask: 'live',
-    },
-  );
+  const result = scoreSteps(new OverlayModel('ferrari296gt3'), frames(ibt), {
+    hz: 15,
+    mask: 'live',
+  });
   ibt.close();
   fs.rmSync(file);
   assert.ok(result.length > 400);

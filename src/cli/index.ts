@@ -24,7 +24,7 @@ import {
   scoreSteps,
 } from '../metrics/index.ts';
 import type { InputMask } from '../model/mask.ts';
-import { OverlayPhysicsModel } from '../model/overlayModel.ts';
+import { OverlayModel } from '../model/overlayModel.ts';
 import type { CarSample, Corner, TireSample } from '../model/types.ts';
 import {
   APP_ARRIVAL_HZ,
@@ -242,7 +242,7 @@ const scoreCommand = (args: string[]): void => {
       flag(args, '--car') ??
       reference.car ??
       summarizeSession(file.sessionYaml).carPath;
-    const steps = scoreSteps(new OverlayPhysicsModel(car), frames(file), {
+    const steps = scoreSteps(new OverlayModel(car), frames(file), {
       hz,
       arrivalHz,
       mask,
@@ -294,7 +294,7 @@ const chart = (args: string[]): void => {
         flag(args, '--car') ?? summarizeSession(file.sessionYaml).carPath;
       data = addModelSeries(
         data,
-        scoreSteps(new OverlayPhysicsModel(car), frames(file), {
+        scoreSteps(new OverlayModel(car), frames(file), {
           hz,
           arrivalHz,
           mask,
