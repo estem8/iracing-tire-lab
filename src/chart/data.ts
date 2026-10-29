@@ -16,6 +16,8 @@ export interface ChartSeries {
   values: (number | null)[];
   /** A model's output, drawn dashed; the file did not record it. */
   dashed?: boolean;
+  /** A second model's output, drawn dotted. */
+  dotted?: boolean;
   /** Share the colour of the series with this name, so one tire keeps one colour. */
   like?: string;
 }

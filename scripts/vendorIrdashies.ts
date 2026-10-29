@@ -19,10 +19,13 @@ import { execFileSync } from 'node:child_process';
 const REPO = 'https://github.com/estem8/irdashies';
 const OUT_DIR = 'src/model/irdashies';
 
-/** [path in irdashies, file name here]. The pure physics, nothing that touches electron or fs. */
+/**
+ * [path in irdashies, file name here]. The pure physics, nothing that touches electron or fs.
+ * TireSurfaceModel.ts is not here: it was forked into src/model/surface/ so its constants can
+ * be changed, and is the lab's own file now.
+ */
 export const FILES: readonly (readonly [string, string])[] = [
   ['src/app/processors/TireThermalModel.ts', 'TireThermalModel.ts'],
-  ['src/app/processors/TireSurfaceModel.ts', 'TireSurfaceModel.ts'],
   ['src/app/processors/tireProfiles.ts', 'tireProfiles.ts'],
   ['src/app/processors/YawGrip.ts', 'YawGrip.ts'],
   ['src/app/processors/tireCalibration.ts', 'tireCalibration.ts'],

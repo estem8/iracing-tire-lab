@@ -1,5 +1,6 @@
 import { MODEL_VERSION } from './irdashies/tireProfiles.ts';
 import { DEFAULT_AMBIENT, frameOf, OverlayPhysics } from './overlayPhysics.ts';
+import type { TuningValues } from './tuning.ts';
 import type {
   Corner,
   Estimate,
@@ -15,6 +16,11 @@ import type {
 export type Gains = Record<Corner, number>;
 
 export interface OverlayModelOptions {
+  /**
+   * Constants to replace for an experiment, by parameter id (see tuning.ts).
+   * None: the overlay's own, which the tests pin to the real processor.
+   */
+  tuning?: TuningValues;
   /**
    * Gains to start from, asked for when the model is made and again whenever it
    * starts over (a new session). Return undefined for none. Ignored for a car
@@ -108,7 +114,7 @@ export class OverlayModel implements TireModel {
   constructor(carPath: string | undefined, options: OverlayModelOptions = {}) {
     this.carPath = carPath;
     this.options = options;
-    this.physics = new OverlayPhysics(carPath);
+    this.physics = new OverlayPhysics(carPath, options.tuning);
     this.freshOffset = this.physics.profile.freshOffset;
     this.applyStartingGains();
   }
@@ -131,7 +137,7 @@ export class OverlayModel implements TireModel {
   }
 
   reset(): void {
-    this.physics = new OverlayPhysics(this.carPath);
+    this.physics = new OverlayPhysics(this.carPath, this.options.tuning);
     this.clear();
     this.session = undefined;
   }

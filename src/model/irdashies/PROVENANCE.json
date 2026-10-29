@@ -10,12 +10,6 @@
       "localSha256": "82616488b4a7103669c3d1af44cebd609784c0be66e710089768092b17c0f3df"
     },
     {
-      "from": "src/app/processors/TireSurfaceModel.ts",
-      "to": "src/model/irdashies/TireSurfaceModel.ts",
-      "upstreamSha256": "b77bbee9a63f5b146bfda92f6c3281fc481154fed9e17e20284bb6e551fc8e48",
-      "localSha256": "1579d368e82ad3a33c745728ac6efabb81df10d6cb74312f28bd3a34f2b9c5e8"
-    },
-    {
       "from": "src/app/processors/tireProfiles.ts",
       "to": "src/model/irdashies/tireProfiles.ts",
       "upstreamSha256": "9cd340723a39978604b73a149c82dcfa87a34e4afa8330464b3762a285aef997",

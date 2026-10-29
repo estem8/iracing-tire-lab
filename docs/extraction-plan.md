@@ -130,6 +130,14 @@ A flag channel is read as the overlay reads it: only the booleans `true` and `fa
 
 Still to do for the milestone, and all of it is in irdashies: the refactor on a local branch, the copied contract test, CI on a temporary `ci/` branch, and the pull request. Nothing there has been changed or pushed.
 
+## 4j. The model workbench (run)
+
+The lab now shows what the overlay's model is made of and lets you change it. `src/model/tuning.ts` lists 23 components (load share, cornering, braking, traction, wheelspin, sliding, bulk heat, cooling and exchange, the air the tires cool toward, the slow model's heat terms, its cooling and carcass node, the start values), each with what it is, how it is computed, the channels it reads and its numbers. A switchable component can be turned off (its heat coefficients go to zero) and any number can be replaced; the model runs again on the recording and the chart shows the recorded channels, the unchanged model (dotted), the changed model (dashed) and the tires panel for the changed one.
+
+**The surface model is forked.** The number the overlay shows for a default GT3 comes from the surface model's bulk node, whose constants were fixed inside `TireSurfaceModel.ts`. To make them arguments the file was copied to `src/model/surface/TireSurfaceModel.ts` and is the lab's own now (the vendor script covers four files). With the defaults it gives the overlay's numbers: the 18 whole-run comparisons against the real processor pass unchanged, and a test checks that running with every registry default given equals running with none.
+
+**What it cannot say.** Switching a component off or changing a constant shows how the overlay's estimate responds, not how the game's tires would. Wheelspin heat does nothing on a recording because the slip estimator is not in the lab. A component whose channels the file lacks does nothing and the page marks the missing channels. Constants of the thermal model are the car's profile, so a truck has other defaults than a GT3. The pit-stop calibration still runs under changed constants, as it does in the overlay.
+
 ## 5. Milestones
 
 Each is small and has an acceptance test.

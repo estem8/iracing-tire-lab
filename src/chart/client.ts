@@ -102,7 +102,7 @@ export const CLIENT_SCRIPT = String.raw`
       }
     }
     if (!like) slot = own < MAX_SLOTS ? own + 1 : 0;
-    p.series.push({ name: s.name, unit: s.unit, values: s.values, on: true, slot: slot, like: like, dashed: !!s.dashed });
+    p.series.push({ name: s.name, unit: s.unit, values: s.values, on: true, slot: slot, like: like, dashed: !!s.dashed, dotted: !!s.dotted });
   });
 
   /* ---------- drawing ---------- */
@@ -184,7 +184,7 @@ export const CLIENT_SCRIPT = String.raw`
     ctx.lineCap = 'round';
     for (k = 0; k < vis.length; k++) {
       ctx.strokeStyle = colorOf(C, vis[k]);
-      ctx.setLineDash(vis[k].dashed ? [6, 4] : []);
+      ctx.setLineDash(vis[k].dotted ? [2, 3] : vis[k].dashed ? [6, 4] : []);
       ctx.beginPath();
       var pen = false, lone = false, lx = 0, ly = 0;
       for (i = i0; i <= i1; i++) {

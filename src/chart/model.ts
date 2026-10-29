@@ -12,6 +12,10 @@ const CORNERS: [Corner, string][] = [
 export interface ModelSeriesOptions {
   /** A model step is shown at the chart points up to this many seconds after it. Default 1. */
   maxGapS?: number;
+  /** The name in front of each series: 'model' by default. */
+  label?: string;
+  /** Draw the lines dotted instead of dashed, to tell a second model from the first. */
+  dotted?: boolean;
 }
 
 /**
@@ -34,6 +38,7 @@ export const addModelSeries = (
     );
   }
   const maxGap = options.maxGapS ?? 1;
+  const name = options.label ?? 'model';
   const unit =
     data.series.find((s) => /tempCM$|tempM$/.test(s.name))?.unit ?? 'C';
   const made: ChartSeries[] = [];
@@ -55,10 +60,10 @@ export const addModelSeries = (
         );
       }
       made.push({
-        name: `model ${label} ${quantity}`,
+        name: `${name} ${label} ${quantity}`,
         unit,
         values,
-        dashed: true,
+        ...(options.dotted ? { dotted: true } : { dashed: true }),
         like: `${label}${quantity === 'carcass' ? 'tempCM' : 'tempM'}`,
       });
     }

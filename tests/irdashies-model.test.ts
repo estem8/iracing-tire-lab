@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { TireThermalModel } from '../src/model/irdashies/TireThermalModel.ts';
-import { TireSurfaceModel } from '../src/model/irdashies/TireSurfaceModel.ts';
+import { TireSurfaceModel } from '../src/model/surface/TireSurfaceModel.ts';
 import {
   DEFAULT_PROFILE,
   MODEL_VERSION,

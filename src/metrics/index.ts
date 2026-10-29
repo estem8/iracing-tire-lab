@@ -12,7 +12,9 @@ export {
 export {
   formatScore,
   score,
+  makeSamples,
   scoreSteps,
+  stepSamples,
   type Group,
   type Phase,
   type Score,

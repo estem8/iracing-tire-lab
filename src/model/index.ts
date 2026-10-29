@@ -39,3 +39,17 @@ export {
   type ChannelFrame,
 } from './overlayPhysics.ts';
 export { fromTelemetryFrame, type TelemetryFrame } from './telemetry.ts';
+export {
+  applyTuning,
+  describeTuning,
+  resolveTuning,
+  type TuningComponent,
+  type TuningDescription,
+  type TuningParam,
+  type TuningRequest,
+  type TuningValues,
+} from './tuning.ts';
+export {
+  SURFACE_DEFAULTS,
+  type SurfaceConstants,
+} from './surface/TireSurfaceModel.ts';

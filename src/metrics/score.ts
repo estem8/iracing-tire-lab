@@ -1,6 +1,6 @@
 import { modelInputs, type ReplayOptions } from '../replay/replay.ts';
 import type { ReplayFrame } from '../replay/samples.ts';
-import type { TireModel, TireOutput } from '../model/types.ts';
+import type { TireModel, TireOutput, TireSample } from '../model/types.ts';
 import { errorStats, type ErrorStats } from './stats.ts';
 import type { Reference } from './reference.ts';
 
@@ -13,15 +13,14 @@ export interface ScoreStep {
   output: TireOutput;
 }
 
-/** Steps a model at the overlay's rate; the phase comes from the sample's flags. */
-export const scoreSteps = (
+/** Steps a model through input samples already made; the phase comes from the sample's flags. */
+export const stepSamples = (
   model: TireModel,
-  frames: Iterable<ReplayFrame>,
-  options: ReplayOptions,
+  samples: readonly TireSample[],
 ): ScoreStep[] => {
   model.reset();
   const steps: ScoreStep[] = [];
-  for (const sample of modelInputs(frames, options)) {
+  for (const sample of samples) {
     const { isOnTrack, onPitRoad } = sample.car;
     const phase: Phase =
       onPitRoad === true
@@ -35,6 +34,19 @@ export const scoreSteps = (
   }
   return steps;
 };
+
+/** The samples a model is given at the overlay's rate, made once so a model can be run on them again and again. */
+export const makeSamples = (
+  frames: Iterable<ReplayFrame>,
+  options: ReplayOptions,
+): TireSample[] => [...modelInputs(frames, options)];
+
+/** Steps a model at the overlay's rate. */
+export const scoreSteps = (
+  model: TireModel,
+  frames: Iterable<ReplayFrame>,
+  options: ReplayOptions,
+): ScoreStep[] => stepSamples(model, makeSamples(frames, options));
 
 export interface ScoreOptions {
   /** A reference is matched to the latest step at or before it, if within this many seconds. Default 1. */

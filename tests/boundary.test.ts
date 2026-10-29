@@ -24,7 +24,7 @@ test('src/model, subfolders included, imports nothing from outside itself', () =
   for (const file of files) {
     const text = fs.readFileSync(file, 'utf8');
     for (const m of text.matchAll(
-      /(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g,
+      /(?:^|[\s;}])(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/gm,
     )) {
       const spec = m[1];
       const inside =

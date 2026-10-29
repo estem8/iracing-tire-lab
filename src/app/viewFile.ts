@@ -9,7 +9,8 @@ import {
 } from '../chart/index.ts';
 import { IbtFile } from '../ibt/reader.ts';
 import { summarizeSession } from '../ibt/session.ts';
-import { scoreSteps, type ScoreStep } from '../metrics/index.ts';
+import { makeSamples, stepSamples, type ScoreStep } from '../metrics/index.ts';
+import type { TireSample } from '../model/types.ts';
 import { OverlayModel } from '../model/overlayModel.ts';
 import { PRODUCTION_HZ, APP_ARRIVAL_HZ } from '../replay/replay.ts';
 import { frames } from '../replay/samples.ts';
@@ -28,6 +29,8 @@ export interface FilePage {
   laps: Lap[];
   /** What the model said along the recording, kept for the lap charts. */
   steps: ScoreStep[];
+  /** The model's inputs at the overlay's rate, kept so the workbench can run the model again. */
+  samples: TireSample[];
 }
 
 /**
@@ -42,12 +45,14 @@ export const renderFilePage = (path: string): FilePage => {
     const car = summarizeSession(file.sessionYaml).carPath;
     let note: string | undefined;
     let steps: ScoreStep[] = [];
+    let samples: TireSample[] = [];
     try {
-      steps = scoreSteps(new OverlayModel(car), frames(file), {
+      samples = makeSamples(frames(file), {
         hz: PRODUCTION_HZ,
         arrivalHz: APP_ARRIVAL_HZ,
         mask: 'live',
       });
+      steps = stepSamples(new OverlayModel(car), samples);
       data = addTirePanel(addModelSeries(data, steps), file, steps);
     } catch (e) {
       note = `The model could not be drawn: ${(e as Error).message}`;
@@ -65,6 +70,7 @@ export const renderFilePage = (path: string): FilePage => {
       note,
       laps: findLaps(file),
       steps,
+      samples,
     };
   } finally {
     file.close();

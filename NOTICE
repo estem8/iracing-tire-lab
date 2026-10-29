@@ -7,8 +7,10 @@ d421f679dd546758fab92201810b8d26d0ea7974, used under the MIT License:
   - src/replay/schedule.ts, from the takeTick function in
     src/app/processors/ProcessorHost.ts
   - src/model/irdashies/, copies of src/app/processors/ TireThermalModel.ts,
-    TireSurfaceModel.ts, tireProfiles.ts, YawGrip.ts and tireCalibration.ts
+    tireProfiles.ts, YawGrip.ts and tireCalibration.ts
     (see src/model/irdashies/PROVENANCE.json)
+  - src/model/surface/TireSurfaceModel.ts, a fork of src/app/processors/
+    TireSurfaceModel.ts whose constants can be changed
   - tests/irdashies-model.test.ts, ported from the specs of those files
 
 The licence of that code:

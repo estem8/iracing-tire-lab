@@ -49,6 +49,12 @@ a { color: var(--accent); }
     <p id="error" role="alert"></p>
   </section>
 
+  <section id="benchsection" hidden>
+    <h2>Model workbench</h2>
+    <p class="muted">See what the overlay\u2019s tire model is made of, switch its components on and off, change its numbers and watch the estimate respond. Pick which channels of the file to chart beside it.</p>
+    <div class="row"><button id="openbench" type="button">Open the workbench</button></div>
+  </section>
+
   <section id="lapsection" hidden>
     <h2>Laps</h2>
     <p class="muted">Chart a lap by distance round the track. Pick a second lap to compare: it is drawn dashed over the first, with the time difference below.</p>
@@ -85,7 +91,11 @@ a { color: var(--accent); }
     });
   }
   function fail(e) { $('error').textContent = e && e.message ? e.message : String(e); }
+  $('openbench').addEventListener('click', function () {
+    window.open('/workbench?t=' + encodeURIComponent(token), '_blank');
+  });
   function showFile(f) {
+    $('benchsection').hidden = !f;
     showLaps(f);
     var out = $('result');
     out.textContent = '';

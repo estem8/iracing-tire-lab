@@ -1,14 +1,16 @@
 /**
- * Vendored from irdashies (MIT, see NOTICE): src/app/processors/TireSurfaceModel.ts
- * at d421f679dd546758fab92201810b8d26d0ea7974. Do not edit here; see scripts/vendorIrdashies.ts.
+ * The tread and bulk temperature model of a tire, forked from irdashies
+ * (MIT, see NOTICE): src/app/processors/TireSurfaceModel.ts at
+ * d421f679dd546758fab92201810b8d26d0ea7974. The lab owns this file now: the
+ * constants are an argument so they can be changed for an experiment. With the
+ * defaults it must give the overlay's numbers, which tests/overlay-equivalence
+ * checks against the real processor.
  */
 import type { Corner as TireCorner } from '../types.ts';
-import type { SurfaceParams } from './tireProfiles.ts';
+import type { SurfaceParams } from '../irdashies/tireProfiles.ts';
 
 const CORNERS: readonly TireCorner[] = ['lf', 'rf', 'lr', 'rr'];
 const GRAVITY = 9.81;
-/** Seconds over which vertical acceleration is averaged: bumps are not banking. */
-const VERTICAL_SMOOTH_S = 1;
 
 export interface SurfaceInput {
   dt: number;
@@ -50,40 +52,75 @@ const unset = (): Record<TireCorner, number> => ({
  * speed and gives its heat to the bulk. Free-run error from a fresh set to the
  * first stop on the dash: 0.5 to 1.5 C on road courses, 3 C on an oval.
  */
-const LOAD = {
+/**
+ * The constants of the tread and bulk nodes. One set for every corner and car
+ * (see the class comment). Each can be replaced for an experiment through the
+ * `tuning` argument; the defaults are the overlay's, and tests pin the model
+ * to the overlay's own output with them.
+ */
+export interface SurfaceConstants {
   /** Share of weight added by downforce at 50 m/s, per (v/50)^2. */
-  aero: 0.594,
+  loadAero: number;
   /** Share moved to the outside tires by 1 g of lateral acceleration. */
-  lateral: 0.458,
-  max: 4,
+  loadLateral: number;
+  /** The most weight share one tire can carry. */
+  loadMax: number;
+  /** Heat grows with the load share to this power (tread slip). */
+  qSlip: number;
+  /** The same for the bulk (hysteresis). */
+  qBulk: number;
+  /** Tread heat from cornering: slip power = load^qSlip x |lateral g| x speed x slip angle. */
+  wSlip: number;
+  /** Tread heat from braking, all four tires. */
+  wBraking: number;
+  /** Tread heat from traction on the driven rear axle. */
+  wDrive: number;
+  /** Tread heat from rear wheelspin. */
+  wSpin: number;
+  /** Tread heat from an axle sliding sideways beyond cornering. */
+  wSlide: number;
+  /** Bulk heat from the cornering slip power. */
+  wbSlip: number;
+  /** Bulk heat from load x speed: tire hysteresis. */
+  wbLoad: number;
+  /** Bulk heat from the averaged brake pedal. */
+  wbBrakeAvg: number;
+  /** Tread cooling to the air: c0 + c1 x speed, per second. */
+  c0: number;
+  c1: number;
+  /** Heat exchange, per second: tread to bulk, and bulk to tread. */
+  kTreadBulk: number;
+  kBulkTread: number;
+  /** Seconds over which the brake pedal is averaged for the bulk heat. */
+  brakeAvgS: number;
+  /** Seconds over which vertical acceleration is averaged: bumps are not banking. */
+  verticalSmoothS: number;
+}
+
+export const SURFACE_DEFAULTS: Readonly<SurfaceConstants> = {
+  loadAero: 0.594,
+  loadLateral: 0.458,
+  loadMax: 4,
+  qSlip: 0.751,
+  qBulk: 1.164,
+  wSlip: 0.0205,
+  wBraking: 0.0291,
+  wDrive: 0.0264,
+  wSpin: 0.114,
+  wSlide: 0.0162,
+  wbSlip: 1.49e-4,
+  wbLoad: 3.25e-3,
+  wbBrakeAvg: 9.38e-3,
+  c0: 6.94e-3,
+  c1: 5.05e-3,
+  kTreadBulk: 0.137,
+  kBulkTread: 0.0113,
+  brakeAvgS: 5,
+  verticalSmoothS: 1,
 };
-/** Heat grows with the load share to this power (tread slip, bulk). */
-const Q_SLIP = 0.751;
-const Q_BULK = 1.164;
+
 /** Lateral and longitudinal acceleration beyond this is a crash, not driving. */
 const ACCEL_MAX = 2.5 * GRAVITY;
-const W = {
-  slip: 0.0205,
-  braking: 0.0291,
-  /** Traction on the driven rear axle. */
-  drive: 0.0264,
-  /** Rear wheelspin. */
-  spin: 0.114,
-  slide: 0.0162,
-};
-const WB = {
-  slip: 1.49e-4,
-  /** Load x speed: tire hysteresis. */
-  load: 3.25e-3,
-  brakeAvg: 9.38e-3,
-};
-const C0 = 6.94e-3;
-const C1 = 5.05e-3;
-/** Tread to bulk, bulk to tread (1/s). */
-const K_TREAD_BULK = 0.137;
-const K_BULK_TREAD = 0.0113;
-/** Seconds over which the brake pedal is averaged for the bulk heat. */
-const BRAKE_AVG_S = 5;
 
 /**
  * The tire temperatures a car shows: the tread surface S (some dashes show
@@ -104,9 +141,11 @@ export class TireSurfaceModel {
   private integrated = false;
 
   private params: SurfaceParams;
+  private k: SurfaceConstants;
 
-  constructor(params: SurfaceParams) {
+  constructor(params: SurfaceParams, tuning: Partial<SurfaceConstants> = {}) {
     this.params = params;
+    this.k = { ...SURFACE_DEFAULTS, ...tuning };
   }
 
   configure(params: SurfaceParams): void {
@@ -157,45 +196,46 @@ export class TireSurfaceModel {
     if (!(dt > 0)) return;
     this.seed(ambient);
     const p = this.params;
+    const k = this.k;
     const h = Math.min(dt, 0.1);
     const braking = Math.max(0, -longitudinal) * speed;
     this.verticalSmooth +=
-      (vertical - this.verticalSmooth) * Math.min(1, h / VERTICAL_SMOOTH_S);
-    this.brakeAvg += (pedal - this.brakeAvg) * Math.min(1, h / BRAKE_AVG_S);
+      (vertical - this.verticalSmooth) * Math.min(1, h / k.verticalSmoothS);
+    this.brakeAvg += (pedal - this.brakeAvg) * Math.min(1, h / k.brakeAvgS);
     const lat = Math.min(Math.abs(lateral), ACCEL_MAX) / GRAVITY;
     const decel = Math.min(Math.max(0, -longitudinal), ACCEL_MAX) / GRAVITY;
     const accel = Math.min(Math.max(0, longitudinal), ACCEL_MAX) / GRAVITY;
-    const air = C0 + C1 * speed;
-    const base = this.verticalSmooth / GRAVITY + LOAD.aero * (speed / 50) ** 2;
+    const air = k.c0 + k.c1 * speed;
+    const base = this.verticalSmooth / GRAVITY + k.loadAero * (speed / 50) ** 2;
 
     for (const corner of CORNERS) {
       const front = corner === 'lf' || corner === 'rf';
       const right = corner === 'rf' || corner === 'rr';
       const load = Math.min(
-        LOAD.max,
+        k.loadMax,
         Math.max(
           0,
-          base + ((right ? 1 : -1) * LOAD.lateral * lateral) / GRAVITY
-        )
+          base + ((right ? 1 : -1) * k.loadLateral * lateral) / GRAVITY,
+        ),
       );
       const slipPower =
-        load ** Q_SLIP * lat * speed * (front ? slipFront : slipRear);
+        load ** k.qSlip * lat * speed * (front ? slipFront : slipRear);
       const heat =
-        W.slip * slipPower +
-        load ** Q_SLIP *
+        k.wSlip * slipPower +
+        load ** k.qSlip *
           speed *
-          (W.braking * decel + (front ? 0 : W.drive * accel)) +
-        (front ? 0 : W.spin * driveSlip) +
-        W.slide * (front ? slideFront : slideRear) * speed;
+          (k.wBraking * decel + (front ? 0 : k.wDrive * accel)) +
+        (front ? 0 : k.wSpin * driveSlip) +
+        k.wSlide * (front ? slideFront : slideRear) * speed;
       const bulkHeat =
-        WB.slip * slipPower +
-        WB.load * load ** Q_BULK * speed +
-        WB.brakeAvg * this.brakeAvg * speed * load;
+        k.wbSlip * slipPower +
+        k.wbLoad * load ** k.qBulk * speed +
+        k.wbBrakeAvg * this.brakeAvg * speed * load;
       const s = this.tread[corner];
       const b = this.bulk[corner];
       this.tread[corner] =
-        s + h * (heat - air * (s - ambient) - K_TREAD_BULK * (s - b));
-      this.bulk[corner] = b + h * (K_BULK_TREAD * (s - b) + bulkHeat);
+        s + h * (heat - air * (s - ambient) - k.kTreadBulk * (s - b));
+      this.bulk[corner] = b + h * (k.kBulkTread * (s - b) + bulkHeat);
 
       const brake = front
         ? p.frontBrake * braking + p.frontPedal * pedal * pedal * speed
@@ -205,12 +245,12 @@ export class TireSurfaceModel {
       this.fast[corner] = Math.max(
         0,
         this.fast[corner] +
-          h * (p.fastShare * brake - this.fast[corner] * fastAir)
+          h * (p.fastShare * brake - this.fast[corner] * fastAir),
       );
       this.slow[corner] = Math.max(
         0,
         this.slow[corner] +
-          h * ((1 - p.fastShare) * brake - this.slow[corner] * slowAir)
+          h * ((1 - p.fastShare) * brake - this.slow[corner] * slowAir),
       );
     }
   }

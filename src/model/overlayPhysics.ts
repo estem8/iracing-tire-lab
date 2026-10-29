@@ -1,6 +1,7 @@
 import { GT3_THERMAL, profileFor } from './irdashies/tireProfiles.ts';
+import { applyTuning, type TuningValues } from './tuning.ts';
 import type { TireProfile } from './irdashies/tireProfiles.ts';
-import { TireSurfaceModel } from './irdashies/TireSurfaceModel.ts';
+import { TireSurfaceModel } from './surface/TireSurfaceModel.ts';
 import { TireThermalModel } from './irdashies/TireThermalModel.ts';
 import { slideOf, slipAngles } from './irdashies/YawGrip.ts';
 import { carChannels } from './channels.ts';
@@ -8,7 +9,6 @@ import type { Corner, StepExtras, TireSample } from './types.ts';
 
 /** Copied from TireProcessor.ts, which is not vendored (it is the glue, see docs/extraction-plan.md). */
 export const DEFAULT_AMBIENT = 25;
-const TRACK_SHARE = 0.3;
 
 /** One frame by SDK channel name; a channel that is absent is absent, never 0. */
 export type ChannelFrame = Readonly<
@@ -34,12 +34,21 @@ export class OverlayPhysics {
   readonly thermal = new TireThermalModel();
   readonly surface: TireSurfaceModel;
   private lastTime: number | undefined;
+  private readonly trackShare: number;
+  /** Whether the number shown comes from the surface model, decided by the car, not by any tuning. */
+  private readonly surfaceShown: boolean;
 
-  constructor(carPath: string | undefined) {
-    this.profile = profileFor(carPath);
+  /** `tuning` replaces constants for an experiment (see tuning.ts); none gives the overlay's own. */
+  constructor(carPath: string | undefined, tuning: TuningValues = {}) {
+    const base = profileFor(carPath);
+    this.surfaceShown = base.thermal === GT3_THERMAL;
+    const tuned = applyTuning(base, tuning);
+    this.profile = tuned.profile;
+    this.trackShare = tuned.trackShare;
     this.thermal.configure(this.profile.thermal);
     this.surface = new TireSurfaceModel(
       (this.profile.surface ?? this.profile.realSurface)!,
+      tuned.surface,
     );
   }
 
@@ -67,11 +76,7 @@ export class OverlayPhysics {
 
   /** The temperature the overlay builds its shown value on (before the per-zone spread). */
   carcass(corner: Corner): number | undefined {
-    if (
-      this.surface.active &&
-      !this.dashShowsSurface &&
-      this.profile.thermal === GT3_THERMAL
-    )
+    if (this.surface.active && !this.dashShowsSurface && this.surfaceShown)
       return this.surface.dash(corner);
     return this.thermal.mean(corner);
   }
@@ -121,7 +126,8 @@ export class OverlayPhysics {
     });
     this.surface.step({
       ...input,
-      ambient: track === undefined ? air : air + TRACK_SHARE * (track - air),
+      ambient:
+        track === undefined ? air : air + this.trackShare * (track - air),
     });
   }
 

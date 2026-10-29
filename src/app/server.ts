@@ -14,6 +14,12 @@ import { IbtError } from '../ibt/errors.ts';
 import { CONTROL_PAGE } from './page.ts';
 import type { System, TelemetryCommand } from './system.ts';
 import { renderFilePage, renderLapPage, type FilePage } from './viewFile.ts';
+import { WORKBENCH_PAGE } from './workbenchPage.ts';
+import {
+  runWorkbench,
+  workbenchInfo,
+  type WorkbenchRequest,
+} from './workbench.ts';
 
 export interface AppServer {
   port: number;
@@ -84,6 +90,7 @@ export const startServer = async (
   const renderLaps = options.renderLaps ?? renderLapPage;
   let current: { name: string; path: string; page: FilePage } | undefined;
   let lastCommand: TelemetryCommand | undefined;
+  let bench: string | undefined;
   let port = 0;
 
   const summary = () =>
@@ -166,6 +173,20 @@ export const startServer = async (
       if (!current) throw new HttpError(404, 'No file is open yet');
       return send(200, 'text/html; charset=utf-8', current.page.html);
     }
+    if (req.method === 'GET' && url.pathname === '/workbench') {
+      return send(200, 'text/html; charset=utf-8', WORKBENCH_PAGE, {
+        'content-security-policy':
+          "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; frame-src 'self'",
+      });
+    }
+    if (req.method === 'GET' && url.pathname === '/workbench/chart') {
+      if (bench === undefined) throw new HttpError(404, 'Run the model first');
+      return send(200, 'text/html; charset=utf-8', bench);
+    }
+    if (req.method === 'GET' && url.pathname === '/api/tuning') {
+      if (!current) throw new HttpError(404, 'No file is open yet');
+      return json(200, workbenchInfo(current.path, current.page));
+    }
     if (req.method === 'GET' && url.pathname === '/lapchart') {
       if (!current) throw new HttpError(404, 'No file is open yet');
       const lapNumber = (name: string): number | undefined => {
@@ -215,6 +236,22 @@ export const startServer = async (
           throw new HttpError(501, (e as Error).message);
         }
         return json(200, { file: picked === undefined ? null : open(picked) });
+      }
+      if (url.pathname === '/api/workbench') {
+        if (!current) throw new HttpError(404, 'No file is open yet');
+        try {
+          const result = runWorkbench(
+            current.path,
+            current.page,
+            body as WorkbenchRequest,
+          );
+          bench = result.html;
+          const { html: _html, ...rest } = result;
+          void _html;
+          return json(200, rest);
+        } catch (e) {
+          throw new HttpError(422, (e as Error).message);
+        }
       }
       if (url.pathname === '/api/telemetry') {
         const command = body.command as TelemetryCommand;
