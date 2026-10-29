@@ -300,3 +300,66 @@ test('tire-lab view writes the chart page next to the file, and a file given alo
   }).toString();
   fs.rmSync(file);
 });
+
+test('laps are listed, and a lap chart is served for one lap or two; bad laps are refused', async () => {
+  const { writeLapsIbt } = await import('./helpers/syntheticIbt.ts');
+  await withServer(async (server) => {
+    const file = writeLapsIbt();
+    const info = JSON.parse(
+      (await post(server, '/api/open', { path: file })).body,
+    ).file;
+    assert.deepEqual(
+      info.laps.map((l: { lap: number }) => l.lap),
+      [0, 1, 2, 3, 4],
+    );
+    assert.equal(info.laps[1].complete, true);
+    assert.ok(Math.abs(info.laps[2].timeS - 58) < 0.05);
+
+    const one = await get(server, '/lapchart?a=2');
+    assert.equal(one.status, 200);
+    assert.match(one.body, /model LF carcass L2/);
+    const two = await get(server, '/lapchart?a=2&b=1');
+    assert.equal(two.status, 200);
+    assert.match(two.body, /time, L1 minus L2/);
+    assert.equal((await get(server, '/lapchart')).status, 400);
+    assert.equal((await get(server, '/lapchart?a=x')).status, 400);
+    assert.equal((await get(server, '/lapchart?a=99')).status, 422);
+    // The token is needed here too.
+    assert.equal((await request(server, 'GET', '/lapchart?a=2')).status, 403);
+    fs.rmSync(file);
+  });
+});
+
+test('tire-lab laps lists the laps, and lapchart writes a lap page', async () => {
+  const { writeLapsIbt } = await import('./helpers/syntheticIbt.ts');
+  const file = writeLapsIbt();
+  const list = execFileSync('node', ['src/cli/index.ts', 'laps', file], {
+    encoding: 'utf8',
+  });
+  assert.match(list, /lap   2  0:58\.0\d\d\s+fastest/);
+  assert.match(list, /lap   0  partial/);
+  const out = file.replace(/\.ibt$/, '.chart.html');
+  execFileSync(
+    'node',
+    [
+      'src/cli/index.ts',
+      'lapchart',
+      file,
+      '--lap',
+      '2',
+      '--compare',
+      '1',
+      '--out',
+      out,
+      '--no-open',
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.match(fs.readFileSync(out, 'utf8'), /time, L1 minus L2/);
+  assert.throws(() =>
+    execFileSync('node', ['src/cli/index.ts', 'lapchart', file, '--lap', 'x'], {
+      stdio: 'pipe',
+    }),
+  );
+  fs.rmSync(file);
+});

@@ -19,7 +19,7 @@ h2 { font-size: 16px; margin: 0 0 8px; }
 p { margin: 0 0 8px; }
 .muted { color: var(--ink2); font-size: 13px; }
 section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-top: 16px; }
-button, input[type=text] { font: inherit; border-radius: 8px; border: 1px solid var(--line); padding: 8px 12px; background: var(--bg); color: var(--ink); }
+button, input[type=text], select { font: inherit; border-radius: 8px; border: 1px solid var(--line); padding: 8px 12px; background: var(--bg); color: var(--ink); }
 button { cursor: pointer; }
 button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 button:disabled { opacity: .5; cursor: default; }
@@ -49,6 +49,17 @@ a { color: var(--accent); }
     <p id="error" role="alert"></p>
   </section>
 
+  <section id="lapsection" hidden>
+    <h2>Laps</h2>
+    <p class="muted">Chart a lap by distance round the track. Pick a second lap to compare: it is drawn dashed over the first, with the time difference below.</p>
+    <div class="row">
+      <label>Lap <select id="lapa"></select></label>
+      <label>compare with <select id="lapb"></select></label>
+      <button id="openlap" type="button">Chart the lap</button>
+    </div>
+    <p id="lapnote" class="muted"></p>
+  </section>
+
   <section>
     <h2>iRacing</h2>
     <p id="sim" class="muted">Checking…</p>
@@ -75,6 +86,7 @@ a { color: var(--accent); }
   }
   function fail(e) { $('error').textContent = e && e.message ? e.message : String(e); }
   function showFile(f) {
+    showLaps(f);
     var out = $('result');
     out.textContent = '';
     if (!f) return;
@@ -91,6 +103,39 @@ a { color: var(--accent); }
       out.appendChild(n);
     }
   }
+  function lapLabel(l, best) {
+    var t = l.timeS === null ? (l.complete ? '' : ' (partial)') : ' ' + Math.floor(l.timeS / 60) + ':' + (l.timeS % 60 < 10 ? '0' : '') + (l.timeS % 60).toFixed(3);
+    return 'Lap ' + l.lap + t + (l.timeS !== null && l.timeS === best ? ' (fastest)' : '');
+  }
+  function showLaps(f) {
+    var sec = $('lapsection'), a = $('lapa'), b = $('lapb');
+    var laps = f && f.laps ? f.laps : [];
+    sec.hidden = false;
+    a.textContent = ''; b.textContent = '';
+    if (laps.length === 0) {
+      $('lapnote').textContent = f ? 'No laps found: the file needs a LapDistPct channel.' : '';
+      sec.hidden = !f;
+      $('openlap').disabled = true;
+      return;
+    }
+    $('openlap').disabled = false;
+    $('lapnote').textContent = '';
+    var times = laps.filter(function (l) { return l.timeS !== null; }).map(function (l) { return l.timeS; });
+    var best = times.length ? Math.min.apply(null, times) : null;
+    var none = document.createElement('option'); none.value = ''; none.textContent = '(no comparison)'; b.appendChild(none);
+    var fastest = laps.filter(function (l) { return l.timeS === best && best !== null; })[0] || laps[0];
+    laps.forEach(function (l) {
+      [a, b].forEach(function (sel) {
+        var o = document.createElement('option'); o.value = String(l.lap); o.textContent = lapLabel(l, best); sel.appendChild(o);
+      });
+    });
+    a.value = String(fastest.lap);
+  }
+  $('openlap').addEventListener('click', function () {
+    var q = '/lapchart?t=' + encodeURIComponent(token) + '&a=' + encodeURIComponent($('lapa').value);
+    if ($('lapb').value !== '') q += '&b=' + encodeURIComponent($('lapb').value);
+    window.open(q, '_blank');
+  });
   function opened(f) { $('error').textContent = ''; showFile(f); window.open('/chart?t=' + encodeURIComponent(token), '_blank'); }
   function status() {
     api('/api/status').then(function (s) {

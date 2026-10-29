@@ -47,6 +47,7 @@ export const CLIENT_SCRIPT = String.raw`
   }
   function pad2(n) { return n < 10 ? '0' + n : String(n); }
   function fmtTime(t, span) {
+    if (DATA.xUnit && DATA.xUnit !== 's') return fmtTick(t);
     if (span >= 120) {
       var s = Math.round(t);
       return Math.floor(s / 60) + ':' + pad2(s % 60);
@@ -234,7 +235,7 @@ export const CLIENT_SCRIPT = String.raw`
       if (!show) { p.tip.hidden = true; return; }
       var vis = visible(p);
       p.tip.textContent = '';
-      p.tip.appendChild(el('div', 'tip-t', 'Time ' + X[state.cursor].toFixed(3) + ' s'));
+      p.tip.appendChild(el('div', 'tip-t', (DATA.xLabel || 'Time') + ' ' + X[state.cursor].toFixed(3) + ' ' + (DATA.xUnit || 's')));
       vis.forEach(function (s) {
         var row = el('div', 'tip-r');
         var key = el('i', 'key');
@@ -409,7 +410,7 @@ export const CLIENT_SCRIPT = String.raw`
   document.getElementById('sub').textContent =
     N + ' points' +
     (DATA.stride > 1 ? ' (every ' + DATA.stride + ' records of ' + DATA.records + '; a spike narrower than that can fall between points)' : ' (every record)') +
-    '. Recorded at ' + DATA.tickRate + ' Hz. x: ' + DATA.xName + ', seconds.';
+    '. Recorded at ' + DATA.tickRate + ' Hz. x: ' + DATA.xName + ', ' + (DATA.xUnit === '%' ? 'percent of the lap' : DATA.xUnit === 'm' ? 'metres along the lap' : 'seconds') + '.';
 
   var chartsEl = document.getElementById('charts');
   panels.forEach(function (p) { chartsEl.appendChild(buildPanel(p)); });

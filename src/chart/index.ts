@@ -8,3 +8,9 @@ export {
 } from './data.ts';
 export { renderChartHtml } from './html.ts';
 export { addModelSeries, type ModelSeriesOptions } from './model.ts';
+export {
+  buildLapChart,
+  findLaps,
+  type Lap,
+  type LapChartOptions,
+} from './laps.ts';

@@ -1,11 +1,14 @@
 import {
   addModelSeries,
   buildChartData,
+  buildLapChart,
+  findLaps,
   renderChartHtml,
+  type Lap,
 } from '../chart/index.ts';
 import { IbtFile } from '../ibt/reader.ts';
 import { summarizeSession } from '../ibt/session.ts';
-import { scoreSteps } from '../metrics/index.ts';
+import { scoreSteps, type ScoreStep } from '../metrics/index.ts';
 import { OverlayModel } from '../model/overlayModel.ts';
 import { PRODUCTION_HZ, APP_ARRIVAL_HZ } from '../replay/replay.ts';
 import { frames } from '../replay/samples.ts';
@@ -20,6 +23,10 @@ export interface FilePage {
   hasModel: boolean;
   /** Why the model's lines are missing, when they are. */
   note: string | undefined;
+  /** The laps of the recording; empty when the file has no LapDistPct. */
+  laps: Lap[];
+  /** What the model said along the recording, kept for the lap charts. */
+  steps: ScoreStep[];
 }
 
 /**
@@ -33,8 +40,9 @@ export const renderFilePage = (path: string): FilePage => {
     let data = buildChartData(file);
     const car = summarizeSession(file.sessionYaml).carPath;
     let note: string | undefined;
+    let steps: ScoreStep[] = [];
     try {
-      const steps = scoreSteps(new OverlayModel(car), frames(file), {
+      steps = scoreSteps(new OverlayModel(car), frames(file), {
         hz: PRODUCTION_HZ,
         arrivalHz: APP_ARRIVAL_HZ,
         mask: 'live',
@@ -54,7 +62,30 @@ export const renderFilePage = (path: string): FilePage => {
       car,
       hasModel,
       note,
+      laps: findLaps(file),
+      steps,
     };
+  } finally {
+    file.close();
+  }
+};
+
+/** One lap of a recording, or two to compare, by distance round the lap (with the model for one). */
+export const renderLapPage = (
+  path: string,
+  page: FilePage,
+  lapA: number,
+  lapB: number | undefined,
+): string => {
+  const find = (n: number): Lap => {
+    const lap = page.laps.find((l) => l.lap === n);
+    if (!lap) throw new Error(`The file has no lap ${n}`);
+    return lap;
+  };
+  const picked = lapB === undefined ? [find(lapA)] : [find(lapA), find(lapB)];
+  const file = IbtFile.open(path);
+  try {
+    return renderChartHtml(buildLapChart(file, picked, { steps: page.steps }));
   } finally {
     file.close();
   }

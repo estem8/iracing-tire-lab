@@ -29,7 +29,7 @@ import type { InputMask } from '../model/mask.ts';
 import { OverlayModel } from '../model/overlayModel.ts';
 import { startServer } from '../app/server.ts';
 import { defaultSystem, type TelemetryCommand } from '../app/system.ts';
-import { renderFilePage } from '../app/viewFile.ts';
+import { renderFilePage, renderLapPage } from '../app/viewFile.ts';
 import type { CarSample, Corner, TireSample } from '../model/types.ts';
 import {
   APP_ARRIVAL_HZ,
@@ -45,6 +45,8 @@ const USAGE = `usage:
   tire-lab chart <file.ibt> --out <chart.html> [--channels A,B,C] [--max-points 5000 | --stride N] [--model [--car <car path>] [--hz ${PRODUCTION_HZ}] [--arrival-hz ${APP_ARRIVAL_HZ}] [--mask live|all]]
   tire-lab score <file.ibt> --reference <reference.json> [--car <car path>] [--max-gap 1] [--hz ${PRODUCTION_HZ}] [--arrival-hz ${APP_ARRIVAL_HZ}] [--mask live|all] [--json]
   tire-lab anonymize <in.ibt> <out.ibt>
+  tire-lab laps <file.ibt>                                 the laps of a recording, with lap times
+  tire-lab lapchart <file.ibt> --lap N [--compare M] [--out page.html] [--no-open]   one lap, or two, by distance
   tire-lab view <file.ibt> [--out page.html] [--no-open]   chart with the model, opened in the browser
   tire-lab app [--no-open] [--port N] [--self-test]        local page: open files, switch iRacing's recording
   tire-lab telemetry <on|off>                              tell iRacing to start or stop recording (Windows)`;
@@ -345,6 +347,62 @@ const anonymize = (args: string[]): void => {
   );
 };
 
+/** Lists the laps of a recording: number, time, and whether the lap is whole. */
+const lapsCommand = (args: string[]): void => {
+  const page = renderFilePage(args[0]);
+  if (page.laps.length === 0) {
+    console.log('No laps found: the file needs a LapDistPct channel.');
+    return;
+  }
+  const times = page.laps.flatMap((l) => (l.timeS === null ? [] : [l.timeS]));
+  const best = times.length > 0 ? Math.min(...times) : undefined;
+  for (const l of page.laps) {
+    const time =
+      l.timeS === null
+        ? l.complete
+          ? ''
+          : 'partial'
+        : `${Math.floor(l.timeS / 60)}:${(l.timeS % 60).toFixed(3).padStart(6, '0')}`;
+    console.log(
+      `lap ${String(l.lap).padStart(3)}  ${time.padEnd(9)}${l.timeS !== null && l.timeS === best ? ' fastest' : ''}`,
+    );
+  }
+};
+
+/** One lap, or two to compare, by distance round the lap. */
+const lapChartCommand = async (args: string[]): Promise<void> => {
+  const lap = Number(flag(args, '--lap'));
+  const withLap = flag(args, '--compare');
+  if (
+    !Number.isInteger(lap) ||
+    (withLap !== undefined && !Number.isInteger(Number(withLap)))
+  )
+    throw new Error(USAGE);
+  const file = args[0];
+  const page = renderFilePage(file);
+  const html = renderLapPage(
+    file,
+    page,
+    lap,
+    withLap === undefined ? undefined : Number(withLap),
+  );
+  const out =
+    flag(args, '--out') ??
+    path.join(
+      path.dirname(file),
+      `${path.basename(file).replace(/\.ibt$/i, '')}.lap${lap}${withLap === undefined ? '' : `-${withLap}`}.html`,
+    );
+  fs.writeFileSync(out, html);
+  console.log(`wrote ${out}`);
+  if (!args.includes('--no-open')) {
+    try {
+      await defaultSystem().openBrowser(out);
+    } catch (e) {
+      console.log(`Open the file yourself: ${(e as Error).message}`);
+    }
+  }
+};
+
 /** A recording's chart with the model, written next to it and opened in the browser. */
 const view = async (args: string[]): Promise<void> => {
   const file = args[0];
@@ -437,6 +495,8 @@ const main = async (): Promise<void> => {
     if (command === 'chart' && args[0]) return chart(args);
     if (command === 'score' && args[0]) return scoreCommand(args);
     if (command === 'view' && args[0]) return await view(args);
+    if (command === 'laps' && args[0]) return lapsCommand(args);
+    if (command === 'lapchart' && args[0]) return await lapChartCommand(args);
     if (command === 'app') return await appCommand(args);
     if (command === 'telemetry') return await telemetryCommand(args);
     if (command === 'anonymize') return anonymize(args);

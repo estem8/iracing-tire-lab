@@ -29,6 +29,10 @@ export interface ChartData {
   /** Every `stride`-th record is a point. */
   stride: number;
   xName: string;
+  /** What x is, for the tooltip: 'Time' (default) or 'Distance'. */
+  xLabel?: string;
+  /** Its unit: 's' (default), 'm' or '%' of the lap. */
+  xUnit?: string;
   /** Seconds, ascending. */
   x: number[];
   series: ChartSeries[];

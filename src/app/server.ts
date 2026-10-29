@@ -13,7 +13,7 @@ import path from 'node:path';
 import { IbtError } from '../ibt/errors.ts';
 import { CONTROL_PAGE } from './page.ts';
 import type { System, TelemetryCommand } from './system.ts';
-import { renderFilePage, type FilePage } from './viewFile.ts';
+import { renderFilePage, renderLapPage, type FilePage } from './viewFile.ts';
 
 export interface AppServer {
   port: number;
@@ -30,6 +30,8 @@ export interface ServerOptions {
   onQuit?: () => void;
   /** How a file becomes a page. Default: the chart with the model. */
   render?: (file: string) => FilePage;
+  /** How a lap, or two, becomes a page. Default: by distance, with the model for one lap. */
+  renderLaps?: typeof renderLapPage;
 }
 
 const MAX_BODY = 64 * 1024;
@@ -79,7 +81,8 @@ export const startServer = async (
 ): Promise<AppServer> => {
   const token = crypto.randomBytes(16).toString('hex');
   const render = options.render ?? renderFilePage;
-  let current: { name: string; page: FilePage } | undefined;
+  const renderLaps = options.renderLaps ?? renderLapPage;
+  let current: { name: string; path: string; page: FilePage } | undefined;
   let lastCommand: TelemetryCommand | undefined;
   let port = 0;
 
@@ -90,6 +93,11 @@ export const startServer = async (
       car: current.page.car ?? null,
       hasModel: current.page.hasModel,
       note: current.page.note ?? null,
+      laps: current.page.laps.map((l) => ({
+        lap: l.lap,
+        timeS: l.timeS,
+        complete: l.complete,
+      })),
     };
 
   const open = (file: unknown) => {
@@ -105,7 +113,7 @@ export const startServer = async (
     }
     if (!stat.isFile()) throw new HttpError(400, 'That is not a file');
     try {
-      current = { name: path.basename(file), page: render(file) };
+      current = { name: path.basename(file), path: file, page: render(file) };
     } catch (e) {
       throw new HttpError(
         422,
@@ -157,6 +165,25 @@ export const startServer = async (
     if (req.method === 'GET' && url.pathname === '/chart') {
       if (!current) throw new HttpError(404, 'No file is open yet');
       return send(200, 'text/html; charset=utf-8', current.page.html);
+    }
+    if (req.method === 'GET' && url.pathname === '/lapchart') {
+      if (!current) throw new HttpError(404, 'No file is open yet');
+      const lapNumber = (name: string): number | undefined => {
+        const raw = url.searchParams.get(name);
+        if (raw === null || raw === '') return undefined;
+        const n = Number(raw);
+        if (!Number.isInteger(n))
+          throw new HttpError(400, `${name} must be a lap number`);
+        return n;
+      };
+      const a = lapNumber('a');
+      if (a === undefined) throw new HttpError(400, 'Pick a lap');
+      try {
+        const html = renderLaps(current.path, current.page, a, lapNumber('b'));
+        return send(200, 'text/html; charset=utf-8', html);
+      } catch (e) {
+        throw new HttpError(422, (e as Error).message);
+      }
     }
     if (req.method === 'GET' && url.pathname === '/api/status') {
       let iracing = false;
