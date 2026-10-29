@@ -1,0 +1,24 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run check:package
+      - name: No recordings or large files
+        run: |
+          if git ls-files | grep -iE '\.(ibt|irdt)$'; then echo "recording committed"; exit 1; fi
+          if git ls-files -z | xargs -0 du -k | awk '$1 > 512' | grep .; then echo "file over 512 KB"; exit 1; fi
