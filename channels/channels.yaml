@@ -1,0 +1,87 @@
+# Registry of telemetry channels relevant to tire state.
+#
+# status: verified   - name, unit and description seen in a real var table
+#         unverified - used somewhere, but not yet seen in a real var table
+#
+# To add or promote an entry, open a PR with the output of
+#   npm run tire-lab -- inspect <file.ibt> --json
+# for the channel, and name the car and session type it came from.
+# Do not guess units: write what the file says.
+
+channels:
+  - name: '{LF,RF,LR,RR}tempC{L,M,R}'
+    meaning: Carcass temperature, left / middle / right zone. Not the surface temperature.
+    unit: C
+    status: verified
+    evidence: irdashies src/app/irsdk/node/utils/mock-data/telemetry.json (live SDK dump)
+    update_behaviour: "unknown. irdashies' TireProcessor comment says the live value only refreshes when a pit stop begins; no recording in this repo shows it yet."
+
+  - name: '{LF,RF,LR,RR}wear{L,M,R}'
+    meaning: Tread remaining per zone.
+    unit: '% (label only: the values are a 0..1 fraction)'
+    status: verified
+    evidence: same dump; e.g. LFwearL = 0.937
+    update_behaviour: unknown
+
+  - name: '{LF,RF,LR,RR}coldPressure'
+    meaning: Cold pressure as set in the garage. Not a live pressure.
+    unit: kPa
+    status: verified
+    evidence: same dump
+    update_behaviour: unknown
+
+  - name: '{LF,RF,LR,RR}temp{L,M,R}'
+    meaning: Tread surface temperature, per zone.
+    unit: unknown
+    status: unverified
+    evidence: read from .ibt by irdashies tools/tire-viewer/replay.ts; absent from the live dump
+    update_behaviour: unknown
+
+  - name: '{LF,RF,LR,RR}pressure'
+    meaning: Hot pressure.
+    unit: unknown
+    status: unverified
+    evidence: read by irdashies TireProcessor; absent from the live dump
+    update_behaviour: unknown
+
+  - name: 'dp{LF,RF,LR,RR}TireColdPress'
+    meaning: Pit-stop cold pressure adjustment.
+    unit: Pa
+    status: verified
+    evidence: same dump. Note Pa, while coldPressure is kPa.
+    update_behaviour: unknown
+
+  - name: PitSvFlags
+    meaning: Bitfield of pit service checkboxes (tire change bits 0x1 LF, 0x2 RF, 0x4 LR, 0x8 RR per irdashies).
+    unit: irsdk_PitSvFlags
+    status: verified
+    evidence: same dump for name and type; bit meaning from irdashies, not re-checked here
+    update_behaviour: unknown
+
+  - name: SessionTime
+    meaning: Seconds since session start.
+    unit: s
+    status: verified
+    evidence: same dump
+    update_behaviour: "60 Hz in the dump's header (tickRate)"
+
+  - name: Speed
+    meaning: GPS vehicle speed.
+    unit: m/s
+    status: verified
+    evidence: same dump
+    update_behaviour: unknown
+
+  - name: 'TrackTempCrew, AirTemp'
+    meaning: Track temperature measured by the crew; air temperature at start/finish.
+    unit: C
+    status: verified
+    evidence: same dump (TrackTemp is deprecated and mirrors TrackTempCrew)
+    update_behaviour: unknown
+
+  - name: 'LatAccel, LongAccel, VertAccel, YawRate, SteeringWheelAngle'
+    meaning: Chassis dynamics. Accelerations include gravity.
+    unit: 'm/s^2, rad/s, rad'
+    status: verified
+    evidence: same dump
+    update_behaviour: 'Each also has a 360 Hz *_ST array form (count 6)'

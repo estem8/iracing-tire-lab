@@ -1,0 +1,7 @@
+node_modules/
+# Never commit recordings: they carry names and ids. See CONTRIBUTING.md.
+*.ibt
+*.irdt
+datasets/raw/
+datasets/private/
+*.log

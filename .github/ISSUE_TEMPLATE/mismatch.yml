@@ -1,0 +1,39 @@
+name: Does not match the game
+description: A tire value differs from what iRacing shows
+labels: [mismatch]
+body:
+  - type: input
+    id: car
+    attributes:
+      label: Car
+    validations:
+      required: true
+  - type: input
+    id: track
+    attributes:
+      label: Track and weather
+    validations:
+      required: true
+  - type: dropdown
+    id: reference
+    attributes:
+      label: Which game value are you comparing to?
+      options:
+        - Cockpit tire readout (dash)
+        - A live telemetry channel
+        - A channel in a recorded .ibt
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: seen
+    attributes:
+      label: What the game shows and what we show, at the same moment
+      description: Numbers, with the time into the session. A screenshot helps. Do not attach an .ibt.
+    validations:
+      required: true
+  - type: textarea
+    id: recording
+    attributes:
+      label: Do you have a recording?
+      description: See docs/recording-protocol.md. Say where an export could be shared if you agree to publish it.
