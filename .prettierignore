@@ -2,3 +2,4 @@
 docs/channels.md
 package-lock.json
 src/model/irdashies/
+tests/golden/processor.json

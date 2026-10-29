@@ -60,12 +60,21 @@ Done on 2026-10-29: the five physics files are in `src/model/irdashies/`, pinned
 - **Surface model (9 specs): the original spec cannot pass against the code it sits beside.** Its input omits `slipFront` and `slipRear`, which the model multiplies by, so every stepped temperature is `NaN` (reproduced); it also calls `temp(corner, ambient)` and `resetTread(corner, start, ambient)` with an extra argument that the class does not take, which the irdashies type check would reject. With both slip angles set to 0 and the arguments fixed, six pass and three miss their thresholds: braking heats the front 6.4 C (spec: more than 15), banking adds 1.5 C (more than 2), a spin heats the rear 15.2 C (more than 20; 20.4 C with 6 degrees of slip). The three are kept as `todo` with those numbers. Whether the spec predates the 27 October refit or the thresholds were never met is not known. In irdashies there was no CI run on this branch, so none of this had been noticed.
 - **One missing input restarts a tire from the air.** `seed()` refills `NaN` with the ambient on the next step, so a single step with a missing input silently loses the tire's temperature (characterised in a test). The processor filters non-finite values, so this is unlikely in the overlay but not guarded by the model.
 
+## 4c. Milestone 2 results (run)
+
+`tests/golden/processor.json` is the real `TireProcessor` of `d421f67` run over a synthetic drive (`tests/golden/stimulus.ts`: 15 Hz ticks with the 50/100 ms step, a session change, a tire change at a pit stop). `scripts/goldenProcessor.cjs` regenerates it from a checkout at the pinned commit (it refuses any other). `src/model/overlayPhysics.ts` is the lab's version of `TireProcessor.stepThermal`.
+
+- **Before the stop the lab equals the overlay exactly** (tread temperature and brake-disc level, three cars, about 2,500 values each compared as rounded integers). Changing `TRACK_SHARE` in the adapter makes it fail, so the test does discriminate.
+- **The physics layer is not enough.** After the tire change the overlay resets the tires to fresh ones; the lab alone keeps heating the old ones and differs by up to 25 C at the stop and 8 C a minute later (`tests/overlay-equivalence.test.ts`, last test). The first seeding of a tire (hottest zone, capped at `staleStart`) is also state-machine logic; the test applies it by hand.
+- **Not covered:** the shown value (`temp`, with its zone spread), pressure and wear; the slip estimator (`driveSlip` is 0 in the lab, the stimulus has no wheel spin).
+- **Found while reading:** `profileFor` gives every car without its own surface the **Cadillac surface constants** (`realSurface: CADILLAC_SURFACE`). So the GT3 dash value comes from a surface model fitted to a GTP car. Together with finding 1 this means GT3 and GTP already share one tire model in the overlay, apart from the thermal layer.
+
 ## 5. Milestones
 
 Each is small and has an acceptance test.
 
 1. **Vendor the physics with provenance.** _Done, see 4b._ Copy the pure files of section 1 into `src/model/`, replace `@irdashies/types` with local types, keep the MIT notice in `NOTICE`, and add a script that reports drift from a pinned irdashies commit. _Accept:_ compiles; `tests/boundary.test.ts` passes (relative imports only); no `electron` or `fs`.
-2. **Equivalence with the overlay.** Run the real `TireProcessor` (bundled with esbuild, as `tire-viewer` does) over a small synthetic stimulus and commit the expected output; the lab model must reproduce it. _Accept:_ equal to within floating-point noise, on a stimulus that includes a pit stop and a session change.
+2. **Equivalence with the overlay.** _Done for the physics layer, see 4c._ Run the real `TireProcessor` (bundled with esbuild, as `tire-viewer` does) over a small synthetic stimulus and commit the expected output; the lab model must reproduce it. _Accept:_ equal to within floating-point noise, on a stimulus that includes a pit stop and a session change.
 3. **Widen the input contract and the adapter.** Extend `TireSample` and `src/replay/samples.ts` with the channels in section 4. _Accept:_ missing channels give `null` in every test; the live mask still hides what the live SDK does not send.
 4. **Measure.** Add error metrics (MAE, RMSE, maximum, by wheel and zone, by phase) and a reference file for values that come from outside the `.ibt`, such as dash readings with their time. _Accept:_ one command prints the table for a recording and a reference file.
 5. **Run finding 1.** Replay a non-Ferrari GT3 recording with a pit stop; compare shown vs calibrated. _Accept:_ a written result, either a confirmed discrepancy or a closed hypothesis.
@@ -86,6 +95,14 @@ Each is small and has an acceptance test.
 Each fix: change in the lab, tag, then an irdashies pull request that raises the version and updates the contract test, with the checks run on a temporary `ci/` branch before the real one. Changing a constant changes `MODEL_VERSION`, and every user's saved gains (`startingGains` ignores another version) are discarded by design, so each model release resets that learning.
 
 **Rule: one source of truth.** While the model is vendored, the lab copy and the irdashies copy must not both be edited; the drift script exists to catch it. After milestone 7 the overlay depends on the lab and has no copy.
+
+## 6b. A claim to check: one model per class, and four kinds of start
+
+A third party told the maintainer (relayed, not verified): the NASCAR Next Gen oval car is a different tire model from GT3 and formula cars, GTP and GT3 share one temperature model, and there are four starting temperatures: fresh change, standing start, rolling start, qualifying start (some cars have no difference between some of them).
+
+What the code says today: one thermal fit (`GT3_THERMAL`) for every car without an entry; the truck and Super Formula are scaled copies of an older fit; one surface fit for everything. Start temperature has two inputs, `freshOffset` (after a tire change, learned from the sim's even reading) and `staleStart` (a new session whose first reading is the last session's). There is no notion of standing, rolling or qualifying start; the session type is not read.
+
+How to check it with data, not opinion: record the start of each kind (garage to grid for a race, a rolling start, a qualifying out-lap, a fresh change in the pits) and read the first minutes of the tread channels and the first dash value. The claim is supported if the starting value differs by kind and is the same across the cars the claim says share a model. Needs recordings from at least a GT3, a GTP and a Next Gen car.
 
 ## 7. Open decisions
 
