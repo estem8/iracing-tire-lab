@@ -49,6 +49,7 @@ export const addTirePanel = (
       {
         temp: [empty(), empty(), empty()],
         tread: empty(),
+        disc: empty(),
         pressure: empty(),
         pressureEstimated: empty(),
         wear: [empty(), empty(), empty()],
@@ -74,6 +75,8 @@ export const addTirePanel = (
         );
       const tread = step?.output.tread?.[c]?.value;
       if (tread !== undefined) panel[c].tread[i] = Math.round(tread * 10) / 10;
+      const disc = step?.output.disc?.[c];
+      if (disc !== undefined) panel[c].disc[i] = disc;
       const pressure = step?.output.pressure?.[c];
       if (pressure) {
         panel[c].pressure[i] = pressure.kpa;

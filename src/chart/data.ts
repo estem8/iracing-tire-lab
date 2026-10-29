@@ -26,6 +26,8 @@ export interface TireCornerSeries {
   temp: [(number | null)[], (number | null)[], (number | null)[]];
   /** The model's tread surface temperature, deg C. */
   tread: (number | null)[];
+  /** Brake disc level 0..1, where the car's dash shows one. */
+  disc: (number | null)[];
   /** Pressure, kPa, and whether each value is calculated (1) or not (0). */
   pressure: (number | null)[];
   pressureEstimated: (number | null)[];

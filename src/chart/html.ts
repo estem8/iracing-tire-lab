@@ -78,15 +78,21 @@ table { width: 100%; border-collapse: collapse; background: var(--surface); bord
 th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--grid); }
 th[scope="col"] { color: var(--muted); font-weight: 500; font-size: 12px; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
-#tires { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; }
-#tires h2 { margin: 0 0 4px; }
-.tires-note { color: var(--ink2); font-size: 12px; margin: 0 0 10px; }
-.tire-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 520px; }
-.tire { border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
-.tire-name { font-size: 12px; font-weight: 600; color: var(--ink2); margin-bottom: 4px; }
-.zones { display: flex; gap: 2px; }
-.zone { flex: 1; text-align: center; padding: 10px 0; font-weight: 600; font-variant-numeric: tabular-nums; border-radius: 3px; background: var(--grid); color: var(--ink); }
-.tire-line { font-size: 12px; color: var(--ink2); margin-top: 4px; font-variant-numeric: tabular-nums; }
+#tires { max-width: 440px; margin: 0 0 16px; padding: 10px; border-radius: 16px; color: #fff;
+  background: linear-gradient(180deg, rgb(0 0 0 / 0.82), rgb(6 44 48 / 0.82)); }
+#tires h2 { margin: 0 0 2px; color: #fff; }
+.tires-note { color: rgb(255 255 255 / 0.65); font-size: 11px; margin: 0 0 8px; }
+.tire-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ot-card { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ot-row { display: flex; align-items: center; gap: 4px; }
+.ot-side { flex: none; width: 2.6em; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 13px; }
+.ot-press { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.ot-press b { font-size: 0.9em; font-variant-numeric: tabular-nums; }
+.ot-press span { font-size: 0.55em; font-weight: 700; text-transform: uppercase; color: rgb(255 255 255 / 0.5); }
+.ot-tire { flex: 1; min-width: 0; display: flex; justify-content: center; }
+.ot-tire svg { width: 100%; max-width: 110px; aspect-ratio: 5 / 7; overflow: visible; }
+.ot-wear { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4%; padding: 0 9%; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; }
+.ot-line { text-align: center; font-size: 10px; color: rgb(255 255 255 / 0.55); }
 [hidden] { display: none !important; }
 `;
 

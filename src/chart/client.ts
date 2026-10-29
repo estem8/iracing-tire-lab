@@ -262,15 +262,78 @@ export const CLIENT_SCRIPT = String.raw`
     updateTires();
   }
 
-  /* ---------- the tires at the cursor ---------- */
-  var TIRE_NAMES = { lf: 'Left front', rf: 'Right front', lr: 'Left rear', rr: 'Right rear' };
+  /* ---------- the tires at the cursor, drawn as the overlay draws them ---------- */
   var TIRE_ORDER = ['lf', 'rf', 'lr', 'rr'];
+  var TIRE_NAMES = { lf: 'Left front', rf: 'Right front', lr: 'Left rear', rr: 'Right rear' };
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  // The overlay's default settings: green at 79 C, blue to red over 25 C either way, glow from 105 C, wear limit 30 %.
+  var OPTIMAL = 79, RANGE = 25, OVERHEAT = 105, WEAR_LIMIT = 30;
+  var ZONE_CENTRES = [0.1, 0.5, 0.9];
   var tireCells = {};
   var tiresHead = null;
-  // Cold to hot, one ramp; the number is always printed, the colour only helps the eye.
-  function tempColor(v) {
-    var t = Math.min(1, Math.max(0, (v - 30) / 80));
-    return 'hsl(' + Math.round(220 - 210 * t) + ', 65%, 36%)';
+  function sv(tag, attrs, parent) {
+    var e = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function tireTempColor(c) {
+    var away = Math.min(1, Math.abs(c - OPTIMAL) / RANGE);
+    var hue = c < OPTIMAL ? 120 + 90 * away : 120 - 120 * away;
+    return 'hsl(' + Math.round(hue) + ' 100% 50%)';
+  }
+  var DISC_STOPS = [[100, 116, 139], [250, 204, 21], [249, 115, 22], [239, 68, 68]];
+  function discColor(level) {
+    var x = Math.min(1, Math.max(0, level)) * (DISC_STOPS.length - 1);
+    var i = Math.min(DISC_STOPS.length - 2, Math.floor(x)), f = x - i;
+    var rgb = DISC_STOPS[i].map(function (c, k) { return Math.round(c + (DISC_STOPS[i + 1][k] - c) * f); });
+    return 'rgb(' + rgb.join(' ') + ')';
+  }
+  // The tire from above: dark sidewalls, a tread carrying the three zone colours, the contact patch.
+  function buildTireSvg(c) {
+    var W = 100, H = 140, TX = 9, TW = W - 2 * TX, cells = {};
+    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, 'aria-hidden': 'true' });
+    var defs = sv('defs', {}, svg);
+    function grad(id, x2, y2, stops) {
+      var g = sv('linearGradient', { id: id, x1: 0, x2: x2, y1: 0, y2: y2 }, defs);
+      return stops.map(function (s) { return sv('stop', { offset: s[0], 'stop-color': s[1] }, g); });
+    }
+    grad('sw' + c, 1, 0, [[0, '#0c0d0f'], [0.06, '#34363c'], [0.12, '#141518'], [0.88, '#141518'], [0.94, '#34363c'], [1, '#0c0d0f']]);
+    cells.stops = grad('tr' + c, 1, 0, [[0.1, '#64748b'], [0.5, '#64748b'], [0.9, '#64748b']]);
+    grad('rd' + c, 0, 1, [[0, 'rgb(0 0 0 / 0.55)'], [0.22, 'rgb(0 0 0 / 0)'], [0.78, 'rgb(0 0 0 / 0)'], [1, 'rgb(0 0 0 / 0.55)']]);
+    grad('sh' + c, 1, 0, [[0, 'rgb(0 0 0 / 0.45)'], [0.12, 'rgb(0 0 0 / 0)'], [0.35, 'rgb(255 255 255 / 0.16)'], [0.5, 'rgb(255 255 255 / 0)'], [0.88, 'rgb(0 0 0 / 0)'], [1, 'rgb(0 0 0 / 0.45)']]);
+    sv('ellipse', { cx: W / 2, cy: H - 2, rx: W * 0.46, ry: 4, fill: 'rgb(0 0 0 / 0.45)' }, svg);
+    sv('rect', { x: 0, y: 1, width: W, height: H - 2, rx: 18, fill: 'url(#sw' + c + ')' }, svg);
+    ['tr', 'sh', 'rd'].forEach(function (g) {
+      sv('rect', { x: TX, y: 3, width: TW, height: H - 6, rx: 13, fill: 'url(#' + g + c + ')' }, svg);
+    });
+    [0.2, 0.8].forEach(function (p) {
+      sv('line', { x1: TX + p * TW, x2: TX + p * TW, y1: 5, y2: H - 5, stroke: 'rgb(255 255 255 / 0.55)', 'stroke-width': 0.8 }, svg);
+    });
+    // The footprint of a tire at a middling load; the lab does not know the load or the slip.
+    sv('ellipse', { cx: 50, cy: 70, rx: TW * 0.3, ry: H * 0.185, fill: 'rgb(255 255 255)', 'fill-opacity': 0.25, stroke: 'rgb(255 255 255)', 'stroke-width': 1.2, 'stroke-opacity': 0.7 }, svg);
+    cells.labels = ZONE_CENTRES.map(function (q, zone) {
+      var t = sv('text', { x: TX + q * TW, y: H / 2, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': zone === 1 ? 19 : 10.5, 'font-weight': 900, fill: 'rgb(0 0 0 / 0.88)', 'paint-order': 'stroke', 'stroke-linejoin': 'round' }, svg);
+      t.textContent = '--';
+      return t;
+    });
+    cells.svg = svg;
+    return cells;
+  }
+  function buildDisc() {
+    var svg = sv('svg', { viewBox: '0 0 24 24', width: '1.6em', height: '1.6em', role: 'img' });
+    var fill = sv('circle', { cx: 12, cy: 12, r: 10, 'fill-opacity': 0.35 }, svg);
+    var ring = sv('circle', { cx: 12, cy: 12, r: 10, fill: 'none', 'stroke-width': 2 }, svg);
+    var hub = sv('circle', { cx: 12, cy: 12, r: 3.2 }, svg);
+    for (var i = 0; i < 8; i++) {
+      var a = i * Math.PI / 4;
+      sv('circle', { cx: 12 + 6.4 * Math.cos(a), cy: 12 + 6.4 * Math.sin(a), r: 1.1, fill: 'rgb(0 0 0 / 0.55)' }, svg);
+    }
+    return { svg: svg, paint: function (level) {
+      var col = discColor(level);
+      fill.setAttribute('fill', col); ring.setAttribute('stroke', col); hub.setAttribute('fill', col);
+      svg.setAttribute('aria-label', 'Brake disc ' + Math.round(level * 100) + '% hot');
+    } };
   }
   function buildTires() {
     if (!DATA.tires) return;
@@ -278,16 +341,34 @@ export const CLIENT_SCRIPT = String.raw`
     box.hidden = false;
     tiresHead = el('h2', 'unit', 'Tires');
     box.appendChild(tiresHead);
-    box.appendChild(el('p', 'tires-note', 'Temperatures and pressure are the overlay model\u2019s estimate. Wear is the sim\u2019s own last reading, which changes only at pit stops. Move over a chart to read another moment.'));
+    box.appendChild(el('p', 'tires-note', 'Drawn as the overlay draws them, with its default colours (green at 79 C). Temperatures, pressure and brake disc are the overlay model’s estimate; the percentages are the sim’s own last reading of tread left, which changes only at pit stops. The lab does not know camber, toe, load or slip, so the tire is not tilted and the footprint is a middling one. Move over a chart to read another moment.'));
     var grid = el('div', 'tire-grid');
     TIRE_ORDER.forEach(function (c) {
-      var card = el('div', 'tire');
-      card.appendChild(el('div', 'tire-name', TIRE_NAMES[c]));
-      var zones = el('div', 'zones');
-      var cells = { zone: [], tread: el('div', 'tire-line'), pressure: el('div', 'tire-line'), wear: el('div', 'tire-line') };
-      for (var k = 0; k < 3; k++) { var z = el('div', 'zone', '\u2013'); cells.zone.push(z); zones.appendChild(z); }
-      card.appendChild(zones);
-      card.appendChild(cells.tread); card.appendChild(cells.pressure); card.appendChild(cells.wear);
+      var left = c === 'lf' || c === 'lr';
+      var card = el('div', 'ot-card');
+      var row = el('div', 'ot-row');
+      var cells = buildTireSvg(c);
+      cells.name = TIRE_NAMES[c];
+      cells.pressNum = el('b', '', '');
+      cells.pressUnit = el('span', '', 'kPa');
+      cells.press = el('div', 'ot-press');
+      cells.press.appendChild(cells.pressNum); cells.press.appendChild(cells.pressUnit);
+      cells.disc = buildDisc();
+      var side = el('div', 'ot-side');
+      side.appendChild(cells.press); side.appendChild(cells.disc.svg);
+      var tire = el('div', 'ot-tire');
+      tire.setAttribute('role', 'img');
+      tire.appendChild(cells.svg);
+      if (left) row.appendChild(side);
+      row.appendChild(tire);
+      if (!left) row.appendChild(side);
+      card.appendChild(row);
+      cells.wear = [0, 1, 2].map(function () { return el('span', '', '--'); });
+      var wear = el('div', 'ot-wear');
+      cells.wear.forEach(function (w) { wear.appendChild(w); });
+      card.appendChild(wear);
+      cells.line = el('div', 'ot-line', '');
+      card.appendChild(cells.line);
       tireCells[c] = cells;
       grid.appendChild(card);
     });
@@ -299,19 +380,31 @@ export const CLIENT_SCRIPT = String.raw`
     var i = state.cursor >= 0 ? state.cursor : 0;
     tiresHead.textContent = 'Tires at ' + (DATA.xLabel || 'Time').toLowerCase() + ' ' + X[i].toFixed(1) + ' ' + (DATA.xUnit || 's');
     TIRE_ORDER.forEach(function (c) {
-      var d = DATA.tires.corners[c], cells = tireCells[c];
+      var d = DATA.tires.corners[c], cells = tireCells[c], temps = [];
       for (var k = 0; k < 3; k++) {
-        var v = d.temp[k][i], z = cells.zone[k];
-        z.textContent = v === null ? '\u2013' : Math.round(v) + '\u00b0';
-        z.style.background = v === null ? '' : tempColor(v);
-        z.style.color = v === null ? '' : '#fff';
+        var v = d.temp[k][i];
+        temps.push(v);
+        cells.stops[k].setAttribute('stop-color', v === null ? 'rgb(100 116 139)' : tireTempColor(v));
+        var hot = v !== null && v >= OVERHEAT, lab = cells.labels[k];
+        lab.textContent = v === null ? '--' : String(Math.round(v));
+        lab.setAttribute('fill', hot ? '#fff' : 'rgb(0 0 0 / 0.88)');
+        if (hot) { lab.setAttribute('stroke', '#7f1d1d'); lab.setAttribute('stroke-width', 2.6); }
+        else { lab.removeAttribute('stroke'); lab.removeAttribute('stroke-width'); }
+      }
+      cells.svg.parentNode.setAttribute('aria-label', cells.name + ' tire: ' + temps.map(function (v) { return v === null ? 'unknown' : Math.round(v) + ' degrees'; }).join(', '));
+      var pr = d.pressure[i];
+      cells.press.hidden = pr === null;
+      if (pr !== null) cells.pressNum.textContent = (d.pressureEstimated[i] === 1 ? '~' : '') + pr.toFixed(0);
+      var dl = d.disc[i];
+      cells.disc.svg.style.display = dl === null ? 'none' : '';
+      if (dl !== null) cells.disc.paint(dl);
+      for (var w = 0; w < 3; w++) {
+        var wv = d.wear[w][i], span = cells.wear[w];
+        span.textContent = wv === null ? '--' : Math.round(wv) + '%';
+        span.style.color = wv === null || wv > WEAR_LIMIT + 20 ? '#fff' : wv > WEAR_LIMIT ? '#fde047' : '#ef4444';
       }
       var tr = d.tread[i];
-      cells.tread.textContent = 'tread surface ' + (tr === null ? '\u2013' : Math.round(tr) + '\u00b0 C');
-      var pr = d.pressure[i];
-      cells.pressure.textContent = 'pressure ' + (pr === null ? '\u2013' : pr.toFixed(1) + ' kPa' + (d.pressureEstimated[i] === 1 ? ' (calculated)' : ''));
-      var w = [d.wear[0][i], d.wear[1][i], d.wear[2][i]];
-      cells.wear.textContent = 'tread left ' + (w.some(function (x) { return x === null; }) ? '\u2013' : w.map(function (x) { return Math.round(x); }).join(' \u00b7 ') + ' %');
+      cells.line.textContent = tr === null ? '' : 'tread surface ' + Math.round(tr) + ' C';
     });
   }
 

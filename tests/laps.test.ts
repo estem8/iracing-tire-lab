@@ -166,6 +166,8 @@ test("the tire panel: model zones, pressure and the sim's wear at each point; a 
     lf.wear.map((z) => z[at]),
     [97, 97, 97],
   );
+  // Ferrari: its dash shows the tire, not a brake disc, so there is no disc level (unknown, not 0).
+  assert.equal(lf.disc[at], null);
   // No coldPressure channel in the fixture: pressure is unknown, not 0.
   assert.equal(lf.pressure[at], null);
 
