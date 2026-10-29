@@ -18,8 +18,10 @@ Checked boxes were verified on 2026-10-29; the rest are open. Re-check a checked
 - [ ] **Run on a real recording.** `inspect`, `export`, `sample` and `anonymize` have only been run on synthetic files. Compare the channel list and units with `channels/channels.yaml`, promote what is seen to `verified`, and run `npm run docs`.
 - [ ] **Check `anonymize` on a real file.** Open the result and confirm no names or ids remain, including other drivers in the session. The redaction list comes from irdashies' code, not from the full YAML a real file contains.
 - [ ] **Run on Windows.** The CLI and file reading have only been run on Linux.
-- [ ] **Add `SECURITY.md`** (where to report a vulnerability) and optionally `CODE_OF_CONDUCT.md`.
-- [ ] **Add repository topics** (`iracing`, `telemetry`, `ibt`, `overlay`).
+- [x] `SECURITY.md` added. It points to GitHub's private report and, if that is missing, to a contentless issue asking for a private channel.
+- [ ] **Enable private vulnerability reporting** (Settings, Code security) once the repository is public. It is not available while the repository is private (the API answers 404), so the first route in `SECURITY.md` does not work until then.
+- [ ] Optionally add `CODE_OF_CONDUCT.md`.
+- [x] Repository topics set: `iracing`, `telemetry`, `ibt`, `overlay`, `sim-racing`, `tires`, `typescript`.
 - [ ] **README status is still honest.** "Scaffold, no model yet" stays until a model exists.
 - [ ] **Protect `main`**: require CI, decide who reviews pull requests.
 - [x] Git history has a single author, a GitHub no-reply address.
