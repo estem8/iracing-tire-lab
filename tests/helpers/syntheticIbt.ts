@@ -64,6 +64,8 @@ export const lapsIbt = (
     lapSeconds?: number[];
     metres?: boolean;
     lapChannel?: boolean;
+    /** The session text, for tests that put names in it. */
+    yaml?: string;
   } = {},
 ): Buffer => {
   const {
@@ -112,7 +114,7 @@ export const lapsIbt = (
     }
   }
   return buildIbt({
-    yaml: YAML,
+    yaml: options.yaml ?? YAML,
     vars: [
       { name: 'SessionTick', type: IbtVarType.Int },
       { name: 'SessionTime', type: IbtVarType.Double },

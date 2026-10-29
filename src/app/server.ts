@@ -17,6 +17,7 @@ import { renderFilePage, renderLapPage, type FilePage } from './viewFile.ts';
 import { WORKBENCH_PAGE } from './workbenchPage.ts';
 import {
   buildReport,
+  digestOf,
   issueUrl,
   previewOf,
   ReportError,
@@ -51,6 +52,11 @@ export interface ServerOptions {
 }
 
 const MAX_BODY = 64 * 1024;
+/** Chart pages show text from the recording: no network, whatever the text says. */
+const CHART_CSP = {
+  'content-security-policy':
+    "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'",
+};
 const COMMANDS: readonly TelemetryCommand[] = ['start', 'stop'];
 
 class HttpError extends Error {
@@ -83,9 +89,16 @@ const readBody = (req: http.IncomingMessage): Promise<unknown> =>
     req.on('end', () => {
       try {
         const text = Buffer.concat(chunks).toString('utf8');
-        resolve(text === '' ? {} : JSON.parse(text));
+        const parsed: unknown = text === '' ? {} : JSON.parse(text);
+        if (
+          typeof parsed !== 'object' ||
+          parsed === null ||
+          Array.isArray(parsed)
+        )
+          throw new Error('not an object');
+        resolve(parsed);
       } catch {
-        reject(new HttpError(400, 'The request is not valid JSON'));
+        reject(new HttpError(400, 'The request is not a JSON object'));
       }
     });
     req.on('error', reject);
@@ -135,6 +148,9 @@ export const startServer = async (
     if (!stat.isFile()) throw new HttpError(400, 'That is not a file');
     try {
       current = { name: path.basename(file), path: file, page: render(file) };
+      // What was run on the previous file does not carry over.
+      bench = undefined;
+      benchRequest = undefined;
     } catch (e) {
       throw new HttpError(
         422,
@@ -185,7 +201,12 @@ export const startServer = async (
     }
     if (req.method === 'GET' && url.pathname === '/chart') {
       if (!current) throw new HttpError(404, 'No file is open yet');
-      return send(200, 'text/html; charset=utf-8', current.page.html);
+      return send(
+        200,
+        'text/html; charset=utf-8',
+        current.page.html,
+        CHART_CSP,
+      );
     }
     if (req.method === 'GET' && url.pathname === '/workbench') {
       return send(200, 'text/html; charset=utf-8', WORKBENCH_PAGE, {
@@ -195,7 +216,7 @@ export const startServer = async (
     }
     if (req.method === 'GET' && url.pathname === '/workbench/chart') {
       if (bench === undefined) throw new HttpError(404, 'Run the model first');
-      return send(200, 'text/html; charset=utf-8', bench);
+      return send(200, 'text/html; charset=utf-8', bench, CHART_CSP);
     }
     if (req.method === 'GET' && url.pathname === '/api/tuning') {
       if (!current) throw new HttpError(404, 'No file is open yet');
@@ -215,7 +236,7 @@ export const startServer = async (
       if (a === undefined) throw new HttpError(400, 'Pick a lap');
       try {
         const html = renderLaps(current.path, current.page, a, lapNumber('b'));
-        return send(200, 'text/html; charset=utf-8', html);
+        return send(200, 'text/html; charset=utf-8', html, CHART_CSP);
       } catch (e) {
         throw new HttpError(422, (e as Error).message);
       }
@@ -278,6 +299,7 @@ export const startServer = async (
         if (!current) throw new HttpError(404, 'No file is open yet');
         const asked = body as unknown as ReportRequest & {
           includeWorkbench?: boolean;
+          digest?: string;
         };
         const request: ReportRequest = {
           ...asked,
@@ -300,22 +322,37 @@ export const startServer = async (
             bytes: gz.length,
             rawBytes,
             hasWorkbench: benchRequest !== undefined,
+            digest: digestOf(gz),
           });
+        if (asked.digest !== digestOf(gz))
+          throw new HttpError(
+            409,
+            'The report changed since the preview (a different workbench run, say). Show what will be saved again.',
+          );
         const dir = options.reportDir ?? path.dirname(current.path);
         const stamp = new Date()
           .toISOString()
           .replace(/[-:]/g, '')
           .replace(/\..*/, '')
           .replace('T', '-');
-        const name = `tire-lab-report-${stamp}.json.gz`;
-        const target = path.join(dir, name);
-        try {
-          fs.writeFileSync(target, gz, { flag: 'wx' });
-        } catch (e) {
-          throw new HttpError(
-            500,
-            `The report could not be saved to ${dir}: ${(e as Error).message}`,
-          );
+        // One-second names can clash (a double click); count up instead of failing.
+        let name = `tire-lab-report-${stamp}.json.gz`;
+        let target = path.join(dir, name);
+        for (let n = 2; ; n++) {
+          try {
+            fs.writeFileSync(target, gz, { flag: 'wx' });
+            break;
+          } catch (e) {
+            if ((e as NodeJS.ErrnoException).code === 'EEXIST' && n < 100) {
+              name = `tire-lab-report-${stamp}-${n}.json.gz`;
+              target = path.join(dir, name);
+              continue;
+            }
+            throw new HttpError(
+              500,
+              `The report could not be saved to ${dir}: ${(e as Error).message}. It is written next to the recording, so that folder must be writable.`,
+            );
+          }
         }
         return json(200, {
           path: target,

@@ -17,6 +17,7 @@ import {
   replayReport,
   serializeReport,
   ReportError,
+  plain,
 } from '../src/app/report.ts';
 import { LAB_VERSION } from '../src/version.ts';
 import type { System } from '../src/app/system.ts';
@@ -222,9 +223,12 @@ test('the preview shows everything but the long series, and says what the series
   ) as Record<string, any>;
   assert.equal(preview.note, request.note);
   assert.equal(preview.observed.length, 1);
-  assert.match(preview.series.numbers, /No names, ids, dates or text/);
+  assert.match(
+    preview.series.numbers,
+    /No driver names, ids, iRating or dates/,
+  );
   assert.equal(preview.series.columns, undefined);
-  assert.match(preview.channels, /channels/);
+  assert.ok(preview.channels.some((c: string) => c.startsWith('LFtempCM')));
   fs.rmSync(file);
 });
 
@@ -317,7 +321,13 @@ test('the app previews, saves and does not overwrite; the CLI replays the saved 
 
     // Run the workbench with a setting; the report then carries it.
     await call(server, 'POST', '/api/workbench', { off: ['braking'] });
-    const saved = await call(server, 'POST', '/api/report/save', request);
+    const digest = JSON.parse(
+      (await call(server, 'POST', '/api/report/preview', request)).body,
+    ).digest;
+    const saved = await call(server, 'POST', '/api/report/save', {
+      ...request,
+      digest,
+    });
     assert.equal(saved.status, 200);
     const s = JSON.parse(saved.body);
     assert.equal(path.dirname(s.path), dir);
@@ -368,5 +378,278 @@ test('the app previews, saves and does not overwrite; the CLI replays the saved 
     await server.close();
     fs.rmSync(file);
     fs.rmSync(dir, { recursive: true });
+  }
+});
+
+// ------------------------------------------------- found by the review
+
+test('a moment at or after the last row replays the whole run, not one step', () => {
+  const file = writeLapsIbt();
+  const page = renderFilePage(file);
+  const last = page.samples[page.samples.length - 1].t;
+  for (const t of [last, last + 50]) {
+    const report = buildReport(page, { ...request, t });
+    const replay = replayReport(readReport(serializeReport(report).gz));
+    assert.ok(replay.roundingGap < 0.1, `t=${t}: gap ${replay.roundingGap}`);
+  }
+  fs.rmSync(file);
+});
+
+test('an observed value is compared with its own quantity only', () => {
+  const file = writeLapsIbt();
+  const report = buildReport(renderFilePage(file), {
+    ...request,
+    observed: [
+      { corner: 'lf', quantity: 'pressure', value: 170, source: 'dash' },
+    ],
+  });
+  // The fixture has no pressure channel: nothing to compare, not the temperature instead.
+  const replay = replayReport(readReport(serializeReport(report).gz));
+  assert.equal(replay.observed[0].unchanged, null);
+  fs.rmSync(file);
+});
+
+const PERSONAL_YAML = [
+  'WeekendInfo:',
+  ' TrackName: spa up',
+  ' TrackConfigName: Grand Prix Pits',
+  ' TrackLength: 7.00 km',
+  ' TrackAirTemp: 20.00 C',
+  ' TeamRacing: 1',
+  'DriverInfo:',
+  ' DriverCarIdx: 0',
+  ' Drivers:',
+  ' - CarIdx: 0',
+  '   UserName: Zaphod Beeblebrox',
+  '   AbbrevName: Beeblebrox Z',
+  '   TeamName: Heart of Gold Racing',
+  '   UserID: 424242',
+  '   TeamID: 777001',
+  '   IRating: 9876',
+  '   LicString: A 4.99',
+  '   CarPath: ferrari296gt3',
+  '   CarScreenName: Ferrari 296 GT3',
+  ' - CarIdx: 1',
+  '   UserName: Arthur Dent',
+  '   TeamName: Towel Racing',
+  '   UserID: 515151',
+  '   IRating: 1234',
+  '   CarPath: bmwm4gt3',
+  '',
+].join('\n');
+
+test('the report holds no driver names, ids or iRating, even when the session text is full of them; it does hold the car and track', () => {
+  const file = writeLapsIbt({ yaml: PERSONAL_YAML });
+  const report = buildReport(renderFilePage(file), request);
+  const { gz } = serializeReport(report);
+  const text = zlib.gunzipSync(gz).toString('utf8');
+  for (const secret of [
+    'Zaphod',
+    'Beeblebrox',
+    'Heart of Gold',
+    '424242',
+    '777001',
+    '9876',
+    'Arthur',
+    'Dent',
+    'Towel',
+    '515151',
+    '1234',
+    'A 4.99',
+  ])
+    assert.ok(!text.includes(secret), `${secret} is in the report`);
+  // What the recording says about the car and track is in it, as the docs say.
+  assert.equal(report.session.carScreenName, 'Ferrari 296 GT3');
+  assert.equal(report.session.trackName, 'spa up');
+  assert.equal(report.session.trackLength, '7.00 km');
+  assert.equal(report.car, 'ferrari296gt3');
+  // And so is the preview the user reads: the same items, the channels listed in full.
+  const preview = JSON.stringify(previewOf(report));
+  assert.ok(
+    preview.includes('Ferrari 296 GT3') && preview.includes('LFtempCM'),
+  );
+  for (const secret of ['Zaphod', '424242'])
+    assert.ok(!preview.includes(secret));
+  fs.rmSync(file);
+});
+
+test('a report from a stranger is read as hostile', () => {
+  const file = writeLapsIbt();
+  const good = buildReport(renderFilePage(file), request);
+  const bad = (patch: (r: any) => void, re: RegExp) => {
+    const copy = JSON.parse(JSON.stringify(good));
+    patch(copy);
+    assert.throws(
+      () => readReport(Buffer.from(JSON.stringify(copy))),
+      (e) => e instanceof ReportError && re.test(e.message),
+    );
+  };
+  bad((r) => delete r.workbench, /workbench settings/);
+  bad(
+    (r) => (r.workbench = { values: { 'start.thermal': 5 }, off: [] }),
+    /not valid/,
+  );
+  bad(
+    (r) => (r.workbench = { values: { 'surface.nope': 1 }, off: [] }),
+    /not valid/,
+  );
+  bad(
+    (r) => (r.workbench = { values: { 'surface.loadMax': -1 }, off: [] }),
+    /between/,
+  );
+  bad((r) => delete r.moment, /no moment/);
+  bad((r) => (r.kind = 'spam'), /kind/);
+  bad((r) => delete r.session, /incomplete/);
+  bad((r) => (r.observed = 'x'), /game/);
+  bad(
+    (r) =>
+      (r.observed = [
+        { corner: 'lf', quantity: 'carcass', value: 'hot', source: 'dash' },
+      ]),
+    /malformed/,
+  );
+  bad((r) => (r.series.columns[0][0] = 'x'), /malformed/);
+  bad((r) => (r.series.t = []), /malformed/);
+  // Unpacked size is bounded.
+  assert.throws(
+    () => readReport(serializeReport(good).gz, 1024),
+    /not a report file/,
+  );
+  // Text that is printed has its control characters taken out.
+  assert.equal(plain('a\u001b[2Jb\u0007c'), 'a [2Jb c');
+  fs.rmSync(file);
+});
+
+test('opening another file forgets the workbench run of the first; the preview is what is saved; names do not clash', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reports2-'));
+  const server = await startServer(fakeSystem, { reportDir: dir });
+  const a = writeLapsIbt();
+  const b = writeLapsIbt();
+  try {
+    await call(server, 'POST', '/api/open', { path: a });
+    await call(server, 'POST', '/api/workbench', { off: ['braking'] });
+    assert.equal((await call(server, 'GET', '/workbench/chart')).status, 200);
+    await call(server, 'POST', '/api/open', { path: b });
+    assert.equal(
+      (await call(server, 'GET', '/workbench/chart')).status,
+      404,
+      'the old run is gone',
+    );
+    const prev = JSON.parse(
+      (await call(server, 'POST', '/api/report/preview', request)).body,
+    );
+    assert.equal(prev.hasWorkbench, false);
+
+    // Save needs the digest of what was previewed.
+    assert.equal(
+      (await call(server, 'POST', '/api/report/save', request)).status,
+      409,
+    );
+    assert.equal(
+      (
+        await call(server, 'POST', '/api/report/save', {
+          ...request,
+          digest: 'x',
+        })
+      ).status,
+      409,
+    );
+    await call(server, 'POST', '/api/workbench', { off: ['cornering'] }); // changes what a report would hold
+    assert.equal(
+      (
+        await call(server, 'POST', '/api/report/save', {
+          ...request,
+          digest: prev.digest,
+        })
+      ).status,
+      409,
+      'not the file that was previewed',
+    );
+
+    const again = JSON.parse(
+      (await call(server, 'POST', '/api/report/preview', request)).body,
+    );
+    const one = await call(server, 'POST', '/api/report/save', {
+      ...request,
+      digest: again.digest,
+    });
+    const two = await call(server, 'POST', '/api/report/save', {
+      ...request,
+      digest: again.digest,
+    });
+    assert.equal(one.status, 200);
+    assert.equal(
+      two.status,
+      200,
+      'a second save in the same second gets its own name',
+    );
+    assert.notEqual(JSON.parse(one.body).path, JSON.parse(two.body).path);
+    assert.equal(fs.readdirSync(dir).length, 2);
+  } finally {
+    await server.close();
+    fs.rmSync(a);
+    fs.rmSync(b);
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('chart pages are served with a policy that forbids the network; a body that is not an object is refused', async () => {
+  const server = await startServer(fakeSystem);
+  const file = writeLapsIbt();
+  const get = (p: string) =>
+    new Promise<http.IncomingMessage>((resolve, reject) => {
+      http
+        .get(
+          {
+            host: '127.0.0.1',
+            port: server.port,
+            path: p,
+            headers: {
+              host: `127.0.0.1:${server.port}`,
+              'x-token': server.token,
+            },
+          },
+          (res) => {
+            res.resume();
+            res.on('end', () => resolve(res));
+          },
+        )
+        .on('error', reject);
+    });
+  try {
+    await call(server, 'POST', '/api/open', { path: file });
+    await call(server, 'POST', '/api/workbench', {});
+    for (const p of ['/chart', '/lapchart?a=2', '/workbench/chart']) {
+      const csp = String((await get(p)).headers['content-security-policy']);
+      assert.match(csp, /connect-src 'none'/, p);
+      assert.match(csp, /default-src 'none'/, p);
+    }
+    assert.equal(
+      (await call(server, 'POST', '/api/workbench', null)).status,
+      400,
+    );
+    assert.equal(
+      (await call(server, 'POST', '/api/telemetry', null)).status,
+      400,
+    );
+    assert.equal(
+      (
+        await call(server, 'POST', '/api/workbench', {
+          values: { 'surface.loadMax': -1 },
+        })
+      ).status,
+      422,
+    );
+    assert.equal(
+      (
+        await call(server, 'POST', '/api/workbench', {
+          values: { 'surface.loadMax': 1e308 },
+        })
+      ).status,
+      422,
+    );
+  } finally {
+    await server.close();
+    fs.rmSync(file);
   }
 });

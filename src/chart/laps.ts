@@ -82,8 +82,13 @@ export const findLaps = (file: IbtFile): Lap[] => {
     const first = seg[0];
     const last = seg[seg.length - 1];
     const next = segments[k + 1]?.[0];
-    const lo = Math.min(...seg.map((s) => s.pct));
-    const hi = Math.max(...seg.map((s) => s.pct));
+    // A loop, not a spread: a segment can hold hundreds of thousands of records.
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const s of seg) {
+      if (s.pct < lo) lo = s.pct;
+      if (s.pct > hi) hi = s.pct;
+    }
     const complete = lo <= 0.05 && hi >= 0.95 && next !== undefined;
     return {
       lap: useLapChannel ? (first.lap as number) : k + 1,

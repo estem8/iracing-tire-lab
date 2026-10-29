@@ -137,6 +137,7 @@ a { color: var(--accent); }
     row.read = function () { return val.value === '' ? null : { corner: corner.value, quantity: qty.value, value: parseFloat(val.value), source: src.value }; };
     return row;
   }
+  var previewDigest = '';
   function reportBody() {
     var obs = [];
     $('robs').childNodes.forEach(function (r) { var o = r.read(); if (o) obs.push(o); });
@@ -151,11 +152,13 @@ a { color: var(--accent); }
     api('/api/report/preview', reportBody()).then(function (r) {
       $('rpre').hidden = false; $('rpre').textContent = JSON.stringify(r.preview, null, 2);
       $('rsize').textContent = 'Saved size: ' + (r.bytes / 1048576).toFixed(2) + ' MB compressed (' + (r.rawBytes / 1048576).toFixed(1) + ' MB as text). ' + (r.hasWorkbench ? '' : 'No workbench settings have been run.');
+      previewDigest = r.digest;
       $('rsave').disabled = false;
     }).catch(function (e) { $('rsave').disabled = true; fail(e); });
   });
   $('rsave').addEventListener('click', function () {
-    api('/api/report/save', reportBody()).then(function (r) {
+    var body = reportBody(); body.digest = previewDigest;
+    api('/api/report/save', body).then(function (r) {
       var out = $('rsaved'); out.textContent = 'Saved ' + r.path + ' (' + (r.bytes / 1048576).toFixed(2) + ' MB). Attach it to the issue. ';
       var a = document.createElement('a'); a.href = r.issueUrl; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Open the issue form on GitHub';
       out.appendChild(a); $('rsave').disabled = true;

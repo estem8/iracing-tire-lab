@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { buildIbt } from '../src/ibt/testBuilder.ts';
+import { IbtVarType } from '../src/ibt/types.ts';
 import { buildLapChart, findLaps } from '../src/chart/laps.ts';
 import { IbtFile } from '../src/ibt/reader.ts';
 import { renderLapPage, renderFilePage } from '../src/app/viewFile.ts';
@@ -196,5 +200,31 @@ test('without steps the panel is not added', async () => {
   const file = writeLapsIbt();
   const data = open(file, (f) => addTirePanel(buildChartData(f), f, []));
   assert.equal(data.tires, undefined);
+  fs.rmSync(file);
+});
+
+test('one lap of hundreds of thousands of records does not stop the file from opening', () => {
+  // A car sitting in the pits for an hour: the distance never wraps, so it is one segment.
+  const rows = Array.from({ length: 200_000 }, (_, i) => ({
+    SessionTick: i,
+    SessionTime: i / 60,
+    LapDistPct: 0.2 + (i % 100) / 1000,
+  }));
+  const file = path.join(os.tmpdir(), `long-${process.pid}.ibt`);
+  fs.writeFileSync(
+    file,
+    buildIbt({
+      yaml: 'WeekendInfo:\n TrackName: t\n',
+      vars: [
+        { name: 'SessionTick', type: IbtVarType.Int },
+        { name: 'SessionTime', type: IbtVarType.Double },
+        { name: 'LapDistPct', type: IbtVarType.Float },
+      ],
+      rows,
+    }),
+  );
+  const laps = open(file, findLaps);
+  assert.equal(laps.length, 1);
+  assert.equal(laps[0].complete, false);
   fs.rmSync(file);
 });

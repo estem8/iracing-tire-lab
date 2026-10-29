@@ -5,10 +5,12 @@ on:
     tags: ['v*']
   pull_request:
     paths:
-      - 'src/app/**'
-      - 'src/cli/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
       - 'scripts/buildExe.ts'
       - 'scripts/makeSampleIbt.ts'
+      - 'tests/helpers/**'
       - '.github/workflows/exe.yml'
   workflow_dispatch:
 

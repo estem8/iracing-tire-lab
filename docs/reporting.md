@@ -6,7 +6,7 @@ Found a tire value that does not match the game, a channel with the wrong unit, 
 
 1. Open your recording in the app ([exe.md](exe.md)), then use **Report a problem** on the first page.
 2. Say what is wrong, the **session time** of the moment (read it off a chart, or pick the start of a lap), and what the game showed then (for example the cockpit readout of the left front: 83 °C). Add a note if it helps. Do not put names or other personal details in the note.
-3. **Show what will be saved.** You see every item of the report except the long series of numbers, which is described. The size is shown.
+3. **Show what will be saved.** You see every item of the report except the long series of numbers, which is described: the car and track, the channels listed one by one, your values and note, the workbench settings. The size is shown. **Save** writes exactly the bytes you previewed; if anything changed in between (the form, or a workbench run), it refuses and asks you to preview again.
 4. **Save the report.** It is a `.json.gz` file written next to your recording. Nothing is sent anywhere.
 5. Open the issue form (a button after saving) and attach the file. The form is pre-filled with the car, the track and your values.
 
@@ -19,7 +19,9 @@ If you have used the model workbench, its last settings can travel with the repo
 - What you typed: the moment, the game values, the note.
 - What the unchanged model said at the moment, in your app.
 
-**Not in it:** the session text (driver names, user and team ids, iRating, other drivers), dates, lap times of the session as a list, the file path, or the recording itself. The file name carries the date and time you saved it. The run still shows how you drove (speed, steering and pedals over time), and the car and track, so it can identify a session to someone who knows it; read the preview and decide. Check iRacing's terms before you publish anything derived from your telemetry; this project has not reviewed them.
+**Not in it:** driver names, user and team ids, iRating, licence, other drivers, the rest of the session text, the file path, the recording itself, and any date inside the file (the file name carries the date and time you saved it). Only the fields listed above are taken from the session text, by name; a test puts names, ids and iRating into a recording's session text and checks none of them reaches the report.
+
+**In it, and personal enough to think about:** the car, track, track length and temperatures as the recording names them, the list of the file's channels with the sim's descriptions, and the run itself. The run shows how you drove (speed, steering and pedals over time), so to someone who knows the track it can identify a session. Read the preview and decide. Check iRacing's terms before you publish anything derived from your telemetry; this project has not reviewed them.
 
 A one-hour run is about one to four megabytes compressed (measured on synthetic data of that size; real noise may make it larger).
 

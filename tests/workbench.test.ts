@@ -82,12 +82,27 @@ test('which model shows the number is said, and follows the car', () => {
   assert.match(describeTuning('trucks ram2026').shownBy, /slow thermal model/);
 });
 
-test("the registry's defaults are the code's: running with every default given is the same as running with none", () => {
+const runSeries = (car: string | undefined, tuning: TuningValues) => {
+  const model = new OverlayModel(car, { tuning });
+  const out: number[] = [];
+  for (const f of stimulus('base')) {
+    const o = model.step(sampleOf(f));
+    for (const c of ['lf', 'rf', 'lr', 'rr'] as const)
+      out.push(
+        o.carcass[c]?.value ?? NaN,
+        o.tread?.[c]?.value ?? NaN,
+        o.pressure?.[c]?.kpa ?? NaN,
+      );
+  }
+  return out;
+};
+
+test("the registry's defaults are the code's: running with every default given is the same as running with none, at every step", () => {
   for (const car of CARS) {
     const all: Record<string, number> = {};
     for (const c of describeTuning(car).components)
       for (const p of c.params) all[p.id] = p.default;
-    assert.deepEqual(finalTemps(car, all), finalTemps(car, {}), String(car));
+    assert.deepEqual(runSeries(car, all), runSeries(car, {}), String(car));
   }
 });
 
@@ -114,7 +129,7 @@ test('resolve: unknown names, non-numbers and components that cannot be switched
   // A value given and a switch-off for the same parameter: off wins.
   assert.deepEqual(
     resolveTuning('ferrari296gt3', {
-      values: { 'surface.wBraking': 5 },
+      values: { 'surface.wBraking': 0.05 },
       off: ['braking'],
     }),
     { 'surface.wBraking': 0 },

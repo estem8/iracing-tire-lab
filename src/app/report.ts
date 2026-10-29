@@ -4,9 +4,12 @@
  * on the whole run before it; the report therefore carries the model's inputs
  * from the start of the session to the moment, at the overlay's 15 Hz, as plain
  * numbers. It carries no session text (no names, ids or dates), no other
- * driver, and no file path. Nothing is sent anywhere: the user saves the file
- * and decides who gets it.
+ * driver, and no file path. It does carry what the recording says about the
+ * car and track (names, track length and temperatures, as the sim writes them)
+ * and the name, unit and description of every channel the file has. Nothing is
+ * sent anywhere: the user saves the file and decides who gets it.
  */
+import crypto from 'node:crypto';
 import zlib from 'node:zlib';
 import { MODEL_VERSION } from '../model/irdashies/tireProfiles.ts';
 import { OverlayModel } from '../model/overlayModel.ts';
@@ -314,37 +317,63 @@ export const serializeReport = (
   return { gz: zlib.gzipSync(raw, { level: 9 }), rawBytes: raw.length };
 };
 
+/** A fingerprint of the saved bytes, so Save can refuse a file that is not the one previewed. */
+export const digestOf = (gz: Buffer): string =>
+  crypto.createHash('sha256').update(gz).digest('hex');
+
 /** What the user is shown before saving: everything except the long series, which is described. */
 export const previewOf = (report: Report): Record<string, unknown> => {
   const { series, channels, ...rest } = report;
   return {
     ...rest,
-    channels: `${channels.length} channels (names, units, descriptions)`,
+    channels: channels.map(
+      (c) =>
+        `${c.name}${c.unit ? ` [${c.unit}]` : ''}${c.count > 1 ? ` x${c.count}` : ''}${c.desc ? ` - ${c.desc}` : ''}`,
+    ),
     series: {
       hz: series.hz,
       rows: series.count,
       sessionTimeFrom: series.from,
       sessionTimeTo: series.to,
-      numbers: `${series.fields.length} columns of the model's inputs: speed, the car's accelerations, pedals, steering, yaw, air and track temperature, flags, and per tire the three carcass and three tread readings, pressures and shock travel. No names, ids, dates or text from the session.`,
+      numbers: `${series.fields.length} columns of the model's inputs: speed, the car's accelerations, pedals, steering, yaw, air and track temperature, flags, and per tire the three carcass and three tread readings, pressures and shock travel. No driver names, ids, iRating or dates.`,
     },
   };
 };
 
-export const readReport = (bytes: Buffer): Report => {
-  let report: Report;
+const MAX_REPORT_BYTES = 256 * 1024 * 1024;
+
+const isObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** Control characters out of text that will be printed, so a report cannot rewrite a terminal. */
+export const plain = (v: unknown): string =>
+  String(v ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ');
+
+/** A report from someone else is read as untrusted: bounded, checked field by field. */
+export const readReport = (
+  bytes: Buffer,
+  maxBytes = MAX_REPORT_BYTES,
+): Report => {
+  let raw: unknown;
   try {
     const text =
       bytes[0] === 0x1f && bytes[1] === 0x8b
-        ? zlib.gunzipSync(bytes).toString('utf8')
-        : bytes.toString('utf8');
-    report = JSON.parse(text) as Report;
+        ? zlib.gunzipSync(bytes, { maxOutputLength: maxBytes }).toString('utf8')
+        : bytes.length > maxBytes
+          ? ''
+          : bytes.toString('utf8');
+    raw = JSON.parse(text);
   } catch {
-    throw new ReportError('That is not a report file');
+    throw new ReportError(
+      'That is not a report file (or it is larger than 256 MB unpacked)',
+    );
   }
-  if (report?.schema !== 1) throw new ReportError('Unknown report version');
+  if (!isObject(raw) || raw.schema !== 1)
+    throw new ReportError('Unknown report version');
+  const report = raw as unknown as Report;
   const s = report.series;
   if (
-    !s ||
+    !isObject(s) ||
     !Array.isArray(s.t) ||
     !Array.isArray(s.fields) ||
     !Array.isArray(s.columns) ||
@@ -352,9 +381,71 @@ export const readReport = (bytes: Buffer): Report => {
     s.columns.some((c) => !Array.isArray(c) || c.length !== s.t.length)
   )
     throw new ReportError('The series of the report is malformed');
+  if (
+    s.t.length === 0 ||
+    s.t.some((x) => typeof x !== 'number' || !Number.isFinite(x))
+  )
+    throw new ReportError('The series of the report is malformed');
+  if (
+    s.columns.some((c) =>
+      c.some(
+        (x) => x !== null && (typeof x !== 'number' || !Number.isFinite(x)),
+      ),
+    )
+  )
+    throw new ReportError('The series of the report is malformed');
   const known = new Set(FIELDS.map((f) => f.name));
   if (s.fields.some((f) => !known.has(f)))
     throw new ReportError('The report has a column this version does not know');
+  if (!KINDS.includes(report.kind))
+    throw new ReportError('The report has an unknown kind');
+  if (
+    !isObject(report.moment) ||
+    typeof report.moment.t !== 'number' ||
+    !Number.isFinite(report.moment.t)
+  )
+    throw new ReportError('The report has no moment');
+  if (
+    !isObject(report.tool) ||
+    !isObject(report.file) ||
+    !isObject(report.session)
+  )
+    throw new ReportError('The report is incomplete');
+  if (report.car !== null && typeof report.car !== 'string')
+    throw new ReportError('The report has a bad car');
+  if (!Array.isArray(report.observed))
+    throw new ReportError('The report has bad values from the game');
+  report.observed = report.observed.slice(0, MAX_OBSERVED).map((o, i) => {
+    try {
+      return cleanRequest({
+        kind: report.kind,
+        t: report.moment.t,
+        observed: [o],
+      }).observed[0];
+    } catch {
+      throw new ReportError(
+        `The game value ${i + 1} in the report is malformed`,
+      );
+    }
+  });
+  report.note =
+    typeof report.note === 'string' ? report.note.slice(0, MAX_NOTE) : '';
+  if (
+    !isObject(report.workbench) ||
+    !isObject(report.workbench.values) ||
+    !Array.isArray(report.workbench.off)
+  )
+    throw new ReportError('The report has bad workbench settings');
+  try {
+    // Unknown or out-of-range ids and values are refused here, before they reach the model.
+    resolveTuning(report.car ?? undefined, {
+      values: report.workbench.values as Record<string, number>,
+    });
+  } catch (e) {
+    throw new ReportError(
+      `The workbench settings in the report are not valid: ${plain((e as Error).message)}`,
+    );
+  }
   return report;
 };
 
@@ -377,7 +468,7 @@ const valueOf = (m: Report['modelAtMoment'], o: Observation): number | null => {
   const v =
     o.quantity === 'pressure'
       ? c.pressureKpa
-      : c.carcass !== undefined && o.quantity === 'carcass'
+      : o.quantity === 'carcass'
         ? c.carcass
         : c.tread;
   return v === undefined ? null : v;
@@ -388,10 +479,14 @@ export const replayReport = (report: Report): Replay => {
   const { t, fields, columns } = report.series;
   const car = report.car ?? undefined;
   const samples = t.map((_, i) => rebuild(fields, columns, t, i));
-  // The last row at or before the moment.
-  let at = t.findIndex((x) => x > report.moment.t) - 1;
-  if (at < -1 || (at === -1 && t[0] > report.moment.t)) at = 0;
-  if (at < 0) at = t.length - 1;
+  // The last row at or before the moment (the first row if the moment is before them all).
+  let at = t.length - 1;
+  for (let i = 0; i < t.length; i++) {
+    if (t[i] > report.moment.t) {
+      at = Math.max(0, i - 1);
+      break;
+    }
+  }
   const run = (tuning: Record<string, number>): Report['modelAtMoment'] => {
     const model = new OverlayModel(car, { tuning });
     let out = {} as ReturnType<OverlayModel['step']>;

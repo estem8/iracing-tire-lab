@@ -850,6 +850,9 @@ export const resolveTuning = (
   for (const [id, value] of Object.entries(request.values ?? {})) {
     if (!known.has(id)) throw new Error(`Unknown parameter: ${id}`);
     if (!Number.isFinite(value)) throw new Error(`${id} must be a number`);
+    const param = known.get(id)!;
+    if (value < param.min || value > param.max)
+      throw new Error(`${id} must be between ${param.min} and ${param.max}`);
     out[id] = value;
   }
   for (const id of request.off ?? []) {

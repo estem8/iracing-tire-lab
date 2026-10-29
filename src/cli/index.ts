@@ -30,7 +30,7 @@ import { OverlayModel } from '../model/overlayModel.ts';
 import { startServer } from '../app/server.ts';
 import { defaultSystem, type TelemetryCommand } from '../app/system.ts';
 import { renderFilePage, renderLapPage } from '../app/viewFile.ts';
-import { readReport, replayReport } from '../app/report.ts';
+import { plain, readReport, replayReport } from '../app/report.ts';
 import type { CarSample, Corner, TireSample } from '../model/types.ts';
 import {
   APP_ARRIVAL_HZ,
@@ -354,12 +354,12 @@ const replayReportCommand = (args: string[]): void => {
   const report = readReport(fs.readFileSync(args[0]));
   const replay = replayReport(report);
   console.log(
-    `${report.kind}: ${report.car ?? 'car not named'}, ${report.session.trackName ?? 'track not named'}, moment ${report.moment.t} s`,
+    `${report.kind}: ${plain(report.car ?? 'car not named')}, ${plain(report.session.trackName ?? 'track not named')}, moment ${report.moment.t} s`,
   );
   console.log(
-    `lab ${report.tool.lab}, model ${report.tool.modelVersion}, ${report.series.count} rows from ${report.series.from} s to ${report.series.to} s`,
+    `lab ${plain(report.tool.lab)}, model ${plain(report.tool.modelVersion)}, ${report.series.t.length} rows from ${report.series.t[0]} s to ${report.series.t[report.series.t.length - 1]} s`,
   );
-  if (report.note) console.log(`note: ${report.note}`);
+  if (report.note) console.log(`note: ${plain(report.note)}`);
   const changed = Object.keys(report.workbench.values).length > 0;
   console.log(
     changed
