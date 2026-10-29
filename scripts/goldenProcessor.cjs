@@ -53,19 +53,20 @@ const out: Record<string, unknown> = {};
 for (const car of CARS) {
   const p = new TireProcessor();
   p.init({ DriverInfo: { DriverCarIdx: 0, Drivers: [{ CarIdx: 0, CarPath: car }] }, WeekendInfo: { TrackName: 'synthetic', SubSessionID: 1 } } as never);
-  const rows: unknown[] = [];
+  // Columns, not rows, to keep the file small: the rounded tread temperature
+  // (tempReal) and the brake-disc level of each corner, one entry per frame.
+  const cols: Record<string, (number | null)[]> = {};
   for (const f of stimulus()) {
     const frame: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(f)) frame[k] = { value: [v] };
     p.onFrame(frame as never);
-    const corners = p.snapshot().corners;
-    rows.push({
-      t: f.SessionTime,
-      corners: Object.fromEntries(
-        Object.entries(corners).map(([k, v]) => [k, { temp: v!.temp, tempReal: v!.tempReal, disc: v!.disc, tempEstimated: v!.tempEstimated }]),
-      ),
-    });
+    const corners = p.snapshot().corners as Record<string, { tempReal?: number[]; disc?: number }>;
+    for (const c of ['lf', 'rf', 'lr', 'rr']) {
+      (cols[c + '.tread'] ??= []).push(corners[c]?.tempReal?.[0] ?? null);
+      (cols[c + '.disc'] ??= []).push(corners[c]?.disc ?? null);
+    }
   }
+  const rows = cols;
   out[car] = rows;
 }
 process.stdout.write(JSON.stringify(out));

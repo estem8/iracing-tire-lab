@@ -5,15 +5,11 @@ import { OverlayPhysics } from '../src/model/overlayPhysics.ts';
 import type { Corner } from '../src/model/types.ts';
 import { CARS, PIT_IN_S, stimulus } from './golden/stimulus.ts';
 
-interface Row {
-  t: number;
-  corners: Partial<
-    Record<Corner, { temp: number[]; tempReal?: number[]; disc?: number }>
-  >;
-}
+/** Per car, per corner: the overlay's rounded tread temperature and disc level, one entry per frame. */
+type Golden = Record<string, Record<string, (number | null)[]>>;
 const golden = JSON.parse(
   fs.readFileSync('tests/golden/processor.json', 'utf8'),
-) as Record<string, Row[]>;
+) as Golden;
 
 const CORNERS: Corner[] = ['lf', 'rf', 'lr', 'rr'];
 const PREFIX: Record<Corner, string> = {
@@ -33,7 +29,7 @@ for (const car of CARS) {
   test(`${car}: lab physics equals the overlay's tread and disc before the stop`, () => {
     const frames = stimulus();
     const rows = golden[car];
-    assert.equal(rows.length, frames.length);
+    assert.equal(rows['lf.tread'].length, frames.length);
     const physics = new OverlayPhysics(car);
     let compared = 0;
     let session: unknown;
@@ -60,19 +56,19 @@ for (const car of CARS) {
       }
       if ((frame.SessionTime as number) >= PIT_IN_S) return;
       for (const c of CORNERS) {
-        const want = rows[i].corners[c];
-        if (!want?.tempReal || !physics.surface.active) continue;
+        const tread = rows[`${c}.tread`][i];
+        if (tread === null || !physics.surface.active) continue;
         compared++;
         assert.equal(
           Math.round(physics.tread(c)),
-          want.tempReal[0],
-          `${car} ${c} tread at t=${rows[i].t}`,
+          tread,
+          `${car} ${c} tread at t=${frame.SessionTime}`,
         );
         if (physics.dashShowsSurface) {
           assert.equal(
             Math.round(physics.surface.discLevel(c) * 20) / 20,
-            want.disc,
-            `${car} ${c} disc at t=${rows[i].t}`,
+            rows[`${c}.disc`][i],
+            `${car} ${c} disc at t=${frame.SessionTime}`,
           );
         }
       }
@@ -113,9 +109,7 @@ test('without the state machine the lab diverges at a tire change', () => {
     for (const c of CORNERS)
       worst = Math.max(
         worst,
-        Math.abs(
-          physics.tread(c) - golden.ferrari296gt3[i].corners[c]!.tempReal![0],
-        ),
+        Math.abs(physics.tread(c) - golden.ferrari296gt3[`${c}.tread`][i]!),
       );
   });
   assert.ok(
