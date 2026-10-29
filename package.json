@@ -49,6 +49,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "docs": "node scripts/channelsDoc.ts",
+    "vendor": "node scripts/vendorIrdashies.ts",
     "tire-lab": "node src/cli/index.ts"
   },
   "devDependencies": {

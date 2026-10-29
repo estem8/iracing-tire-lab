@@ -32,21 +32,22 @@ A recording can hold more than the overlay receives, and the overlay does not gi
 
 ## Layout
 
-| Path                         | What                                                          |
-| ---------------------------- | ------------------------------------------------------------- |
-| `src/ibt/`                   | `.ibt` reader: header, var table with units, array channels   |
-| `src/cli/`                   | `inspect`, `export`, `chart`, `sample`, `anonymize`           |
-| `src/chart/`                 | HTML chart of channels with a switch per series               |
-| `src/replay/`                | IBT to model input, overlay frame schedule, replay            |
-| `src/model/`                 | provisional contract and input mask; the model will live here |
-| `channels/channels.yaml`     | which channels are verified, with evidence                    |
-| `datasets/manifest.json`     | list of recordings (the recordings themselves are not in git) |
-| `docs/getting-started.md`    | from an `.ibt` to a CSV; installing the package               |
-| `docs/channels.md`           | channel reference, generated from `channels.yaml`             |
-| `docs/extraction-plan.md`    | how the tire model moves in, is measured, and returns         |
-| `docs/release-checklist.md`  | what to check before opening the repo and before publishing   |
-| `docs/recording-protocol.md` | how to capture a useful stint                                 |
-| `examples/`                  | runnable scripts: read a file, replay a model                 |
+| Path                         | What                                                             |
+| ---------------------------- | ---------------------------------------------------------------- |
+| `src/ibt/`                   | `.ibt` reader: header, var table with units, array channels      |
+| `src/cli/`                   | `inspect`, `export`, `chart`, `sample`, `anonymize`              |
+| `src/chart/`                 | HTML chart of channels with a switch per series                  |
+| `src/replay/`                | IBT to model input, overlay frame schedule, replay               |
+| `src/model/`                 | provisional contract and input mask; the model will live here    |
+| `src/model/irdashies/`       | the tire physics copied from irdashies, pinned and drift-checked |
+| `channels/channels.yaml`     | which channels are verified, with evidence                       |
+| `datasets/manifest.json`     | list of recordings (the recordings themselves are not in git)    |
+| `docs/getting-started.md`    | from an `.ibt` to a CSV; installing the package                  |
+| `docs/channels.md`           | channel reference, generated from `channels.yaml`                |
+| `docs/extraction-plan.md`    | how the tire model moves in, is measured, and returns            |
+| `docs/release-checklist.md`  | what to check before opening the repo and before publishing      |
+| `docs/recording-protocol.md` | how to capture a useful stint                                    |
+| `examples/`                  | runnable scripts: read a file, replay a model                    |
 
 ## Roadmap
 

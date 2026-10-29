@@ -37,14 +37,23 @@ const stray = packed[0].files
 if (stray.length > 0)
   fail(`unexpected files in the tarball: ${stray.join(', ')}`);
 
-// 2. The pure model must not reach for I/O: relative imports only.
+// 2. The pure model must not reach for I/O: relative imports that stay inside dist/model.
 const modelDir = path.join(root, 'dist/model');
-for (const name of fs.readdirSync(modelDir).filter((n) => n.endsWith('.js'))) {
-  const text = fs.readFileSync(path.join(modelDir, name), 'utf8');
+const jsFiles = (dir: string): string[] =>
+  fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) return jsFiles(full);
+    return e.name.endsWith('.js') ? [full] : [];
+  });
+for (const file of jsFiles(modelDir)) {
+  const text = fs.readFileSync(file, 'utf8');
   for (const m of text.matchAll(
     /^\s*(?:import|export)[^'"\n]*from\s*['"]([^'"]+)['"]/gm,
   )) {
-    if (!m[1].startsWith('./')) fail(`dist/model/${name} imports ${m[1]}`);
+    const inside =
+      m[1].startsWith('.') &&
+      path.resolve(path.dirname(file), m[1]).startsWith(modelDir + path.sep);
+    if (!inside) fail(`${path.relative(root, file)} imports ${m[1]}`);
   }
 }
 

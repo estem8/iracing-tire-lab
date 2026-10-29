@@ -1,0 +1,37 @@
+{
+  "repo": "https://github.com/estem8/irdashies",
+  "branch": "feat/tire-widget",
+  "commit": "d421f679dd546758fab92201810b8d26d0ea7974",
+  "files": [
+    {
+      "from": "src/app/processors/TireThermalModel.ts",
+      "to": "src/model/irdashies/TireThermalModel.ts",
+      "upstreamSha256": "c49f53db0b223cf0412cf3fa52a7791db5a319b5241e18586dc009f17012db64",
+      "localSha256": "82616488b4a7103669c3d1af44cebd609784c0be66e710089768092b17c0f3df"
+    },
+    {
+      "from": "src/app/processors/TireSurfaceModel.ts",
+      "to": "src/model/irdashies/TireSurfaceModel.ts",
+      "upstreamSha256": "b77bbee9a63f5b146bfda92f6c3281fc481154fed9e17e20284bb6e551fc8e48",
+      "localSha256": "1579d368e82ad3a33c745728ac6efabb81df10d6cb74312f28bd3a34f2b9c5e8"
+    },
+    {
+      "from": "src/app/processors/tireProfiles.ts",
+      "to": "src/model/irdashies/tireProfiles.ts",
+      "upstreamSha256": "9cd340723a39978604b73a149c82dcfa87a34e4afa8330464b3762a285aef997",
+      "localSha256": "b36ba944ff138955a54fded9beee899bb0ebd7970525bcf8af7e1e7e7e5c1347"
+    },
+    {
+      "from": "src/app/processors/YawGrip.ts",
+      "to": "src/model/irdashies/YawGrip.ts",
+      "upstreamSha256": "f88762affe6bd94c3b8fedda446c796c60db11206f6a0d547abbbf65982b11db",
+      "localSha256": "f56b2562f55cc37c33b578ec90db9a2b1b412b4e911991a94c69ab315f64ee9a"
+    },
+    {
+      "from": "src/app/processors/tireCalibration.ts",
+      "to": "src/model/irdashies/tireCalibration.ts",
+      "upstreamSha256": "05ef3205a3010e9dc43efefdc5a8018c7fae424ebb1314b1b5de1e4a0fd21da5",
+      "localSha256": "4735a68c9f875def6dc5b1a03525d00fbf5e783df2a0761935cd4a4c26456ea8"
+    }
+  ]
+}

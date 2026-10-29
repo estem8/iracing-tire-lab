@@ -1,6 +1,17 @@
-Parts of src/ibt/ (types.ts, binary.ts, reader.ts, testBuilder.ts) are adapted
-from irdashies, https://github.com/tariknz/irdashies, src/app/ibt/ at commit
+Parts of this repository are adapted or copied from irdashies,
+https://github.com/tariknz/irdashies (the feat/tire-widget branch of
+https://github.com/estem8/irdashies), at commit
 d421f679dd546758fab92201810b8d26d0ea7974, used under the MIT License:
+
+  - src/ibt/ (types.ts, binary.ts, reader.ts, testBuilder.ts), from src/app/ibt/
+  - src/replay/schedule.ts, from the takeTick function in
+    src/app/processors/ProcessorHost.ts
+  - src/model/irdashies/, copies of src/app/processors/ TireThermalModel.ts,
+    TireSurfaceModel.ts, tireProfiles.ts, YawGrip.ts and tireCalibration.ts
+    (see src/model/irdashies/PROVENANCE.json)
+  - tests/irdashies-model.test.ts, ported from the specs of those files
+
+The licence of that code:
 
 MIT License
 
