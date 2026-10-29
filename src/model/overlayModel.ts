@@ -3,6 +3,8 @@ import { DEFAULT_AMBIENT, frameOf, OverlayPhysics } from './overlayPhysics.ts';
 import type {
   Corner,
   Estimate,
+  ModelEvent,
+  StepExtras,
   TireModel,
   TireOutput,
   TireSample,
@@ -69,8 +71,8 @@ export interface ShownCorner {
  * per-stop gain, the fresh-tire offset) and, for a tire that was changed, puts
  * fresh tires in the model.
  *
- * Not ported: wear and wear rate, load from shock travel, camber and toe, the
- * slip estimator (so wheel-spin heat is 0), saved calibrations on disk. A
+ * Not ported: wear and wear rate (the `events` of each step tell a caller when to reset its own), load from shock travel, camber and toe, the
+ * slip estimator (so wheel-spin heat is 0 unless the caller passes `driveSlip`), saved calibrations on disk. A
  * sample without all four carcass zones and wear zones for a tire says nothing
  * about that tire, as in the overlay.
  */
@@ -84,6 +86,7 @@ export class OverlayModel implements TireModel {
   private pendingBits = 0;
   private orderedBits = 0;
   private freshOffset: number;
+  private events: ModelEvent[] = [];
   /** What each corner would show on the latest sample. */
   shown: Partial<Record<Corner, ShownCorner>> = {};
 
@@ -108,9 +111,11 @@ export class OverlayModel implements TireModel {
     this.orderedBits = 0;
     this.freshOffset = this.physics.profile.freshOffset;
     this.shown = {};
+    this.events.push({ kind: 'clear' });
   }
 
-  step(sample: TireSample): TireOutput {
+  step(sample: TireSample, extras: StepExtras = {}): TireOutput {
+    this.events = [];
     // A new session starts on other tires: begin again. A sample without
     // SessionNum says nothing.
     const num = sample.car.sessionNum;
@@ -134,7 +139,7 @@ export class OverlayModel implements TireModel {
       }
     }
 
-    this.physics.step(frameOf(sample));
+    this.physics.step(frameOf(sample), extras);
     if (sample.car.onPitRoad !== true)
       this.orderedBits = this.requested(sample);
     this.trackStints(sample, readings, temps);
@@ -208,6 +213,7 @@ export class OverlayModel implements TireModel {
         thermal.set(c, start);
         surface.resetTread(c, start);
         seeded.refTemp = thermal.mean(c);
+        this.events.push({ kind: 'seed', corner: c, changed: false });
         continue;
       }
       const changed = (flags & TIRE_CHANGE_BIT[c]) !== 0;
@@ -226,6 +232,7 @@ export class OverlayModel implements TireModel {
       }
       st.tempOffset = offsets(temp);
       st.fresh = changed;
+      this.events.push({ kind: 'refresh', corner: c, changed });
     }
     if (!seeding) this.service = { applied: flags, running: false };
   }
@@ -256,6 +263,7 @@ export class OverlayModel implements TireModel {
       thermal.set(c, ambient + this.freshOffset);
       st.refTemp = ambient + this.freshOffset;
       surface.resetTread(c, ambient + this.freshOffset);
+      this.events.push({ kind: 'fresh-late', corner: c, changed: true });
     }
     this.service = undefined;
     this.pendingBits = 0;
@@ -293,7 +301,12 @@ export class OverlayModel implements TireModel {
     });
     const { physics } = this;
     const ambient = this.ambient(sample);
-    const out: TireOutput = { carcass: {}, tread: {}, shown: {} };
+    const out: TireOutput = {
+      carcass: {},
+      tread: {},
+      shown: {},
+      events: this.events,
+    };
     this.shown = {};
     for (const c of CORNERS) {
       const temp = temps[c];

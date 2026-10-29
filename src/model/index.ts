@@ -1,6 +1,8 @@
 /** The pure model surface: contract types and the input mask. No I/O, no UI. */
 export type {
   CarSample,
+  ModelEvent,
+  StepExtras,
   Corner,
   Estimate,
   Measured,
@@ -23,3 +25,4 @@ export {
   frameOf,
   type ChannelFrame,
 } from './overlayPhysics.ts';
+export { fromTelemetryFrame, type TelemetryFrame } from './telemetry.ts';

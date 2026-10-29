@@ -110,13 +110,23 @@ Done on 2026-10-29: the five physics files are in `src/model/irdashies/`, pinned
 - **Few touch points.** Outside the tire files only `processorRegistry.ts` and `iracingSdkBridge.ts` mention `TireProcessor`, so a refactor behind the class keeps the rest unchanged.
 - **The proof of "output unchanged" already exists.** `tests/golden/stimulus.ts` and `processor.json.gz` are the pre-refactor processor's output on 18 synthetic runs. The same stimulus and expected output, copied into irdashies as a test, must pass before and after the change.
 
-What the adapter needs from the lab that it lacks today (lab-only changes, to do first):
+What the adapter needs from the lab that it lacked (lab-only changes; **done, see 4i**):
 
 1. A **refresh event** from `OverlayModel` (a reading was seeded or refreshed, and for which corners the tire was changed). The overlay's wear baseline and per-lap rate hang on that moment and stay in the overlay.
 2. A **drive-slip input** (`driveSlip`) the caller can supply, because the slip estimator stays in the overlay; today the lab uses 0.
 3. A converter from the overlay's telemetry frame to `TireSample` (lives in the overlay; the lab's `readCar` and channel table can be reused).
 
 Then in irdashies, on a local branch: `TireProcessor` keeps wear, load, alignment, slip and the snapshot, and calls `OverlayModel` for temperature, tread, disc and pressure; the five vendored files are deleted. Checks run on a temporary `ci/` branch of the fork (both operating systems) before any pull request.
+
+## 4i. The three lab changes for the adapter (run)
+
+1. **Events.** `OverlayModel.step` returns `output.events`: `clear` (new session), `seed` and `refresh` (per tire, with `changed`), `fresh-late` (a change ordered only while the service ran). The list is per step and empty when nothing happened. Tests check which tires are changed in each of the six variants and when.
+2. **`driveSlip`.** `step(sample, { driveSlip })`; 0 when not given. Tested only against the model itself (a larger value heats the rears and not the fronts), **not** against a real processor run with wheel spin: the synthetic drive has no engine speed, so the real slip estimator gave 0 there.
+3. **Telemetry converter.** `fromTelemetryFrame(frame)` takes the overlay's frame shape (`{ Channel: { value: [x] } }`) and gives a `TireSample`. All 54 runs (3 cars x 6 variants, plus the earlier sample path) equal the real processor's output when fed through it. Absent, non-finite and non-numeric channels are null; `t` is NaN without `SessionTime`; shock travel falls back to the `SH` name like the overlay.
+
+One difference to keep in mind: the converter takes the number 1 as a set flag as well as `true`; the overlay takes only `true`. The SDK sends booleans, so it should not matter, but it is not the same code.
+
+Still to do for the milestone, and all of it is in irdashies: the refactor on a local branch, the copied contract test, CI on a temporary `ci/` branch, and the pull request. Nothing there has been changed or pushed.
 
 ## 5. Milestones
 

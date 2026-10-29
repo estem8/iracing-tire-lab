@@ -74,7 +74,7 @@ export interface CarSample {
 }
 
 export interface TireSample {
-  /** Session time, s. */
+  /** Session time, s. NaN when the source has no SessionTime (the model then takes no time step). */
   t: number;
   /** Seconds since the previous sample; the caller decides what a gap is. */
   dt: number;
@@ -90,7 +90,36 @@ export interface Estimate<T> {
   readonly value: T;
 }
 
+/**
+ * Something the model's state machine did on one step, for a caller that keeps
+ * state of its own (the overlay's wear baseline hangs on these moments).
+ *  clear      a new session: everything the model knew was dropped
+ *  seed       the first reading of a session started this tire
+ *  refresh    a later reading arrived (a pit stop began); `changed` says whether
+ *             the tire was ordered changed at that moment
+ *  fresh-late the tire was ordered changed only while the service ran, and is
+ *             treated as fresh now that it ended
+ */
+export type ModelEvent =
+  | { kind: 'clear' }
+  | {
+      kind: 'seed' | 'refresh' | 'fresh-late';
+      corner: Corner;
+      changed: boolean;
+    };
+
+/** Inputs a caller computes itself, because the model does not have the means to. */
+export interface StepExtras {
+  /**
+   * Heat from driven-wheel spin (m/s of slip beyond ordinary traction, times
+   * throttle), from a slip estimator. 0 when not given.
+   */
+  driveSlip?: number;
+}
+
 export interface TireOutput {
+  /** What the state machine did on this step, in order; empty when nothing. */
+  events?: ModelEvent[];
   carcass: Partial<Record<Corner, Estimate<number>>>;
   /** Tread surface temperature, where the model has one. */
   tread?: Partial<Record<Corner, Estimate<number>>>;

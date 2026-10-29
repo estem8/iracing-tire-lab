@@ -4,7 +4,7 @@ import { TireSurfaceModel } from './irdashies/TireSurfaceModel.ts';
 import { TireThermalModel } from './irdashies/TireThermalModel.ts';
 import { slideOf, slipAngles } from './irdashies/YawGrip.ts';
 import { carChannels } from './channels.ts';
-import type { Corner, TireSample } from './types.ts';
+import type { Corner, StepExtras, TireSample } from './types.ts';
 
 /** Copied from TireProcessor.ts, which is not vendored (it is the glue, see docs/extraction-plan.md). */
 export const DEFAULT_AMBIENT = 25;
@@ -24,7 +24,7 @@ const num = (frame: ChannelFrame, key: string): number | undefined => {
  * The physics layer of the overlay's TireProcessor, and nothing above it: the
  * same models, fed the same way as `TireProcessor.stepThermal`. It leaves out
  * the stint and pit-stop state machine (a stop does not reset or calibrate a
- * tire here) and the slip estimator (wheel-spin heat, `driveSlip`, is 0). So it
+ * tire here) and the slip estimator (wheel-spin heat, `driveSlip`, is 0 unless the caller gives it). So it
  * reproduces the processor only between session changes and stops, and on a
  * stimulus without wheel spin; tests/overlay-equivalence.test.ts says so with a
  * real processor's output.
@@ -76,7 +76,7 @@ export class OverlayPhysics {
     return this.thermal.mean(corner);
   }
 
-  step(frame: ChannelFrame): void {
+  step(frame: ChannelFrame, extras: StepExtras = {}): void {
     const time = num(frame, 'SessionTime');
     const dt =
       time !== undefined && this.lastTime !== undefined
@@ -101,7 +101,7 @@ export class OverlayPhysics {
       speed,
       lateral: num(frame, 'LatAccel') ?? 0,
       longitudinal: num(frame, 'LongAccel') ?? 0,
-      driveSlip: 0,
+      driveSlip: extras.driveSlip ?? 0,
       ambient: air,
       steering: Math.abs(wheel),
       yawRate: Math.abs(yaw),
